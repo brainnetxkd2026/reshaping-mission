@@ -569,6 +569,52 @@
 
   /* ===== 地图选择（开始任务前） ===== */
   #overlayMap { background: rgba(7, 12, 9, 0.9); backdrop-filter: blur(5px); }
+  /* ===== 剧情副本 ===== */
+  #overlayStory { background: rgba(9, 8, 14, 0.92); backdrop-filter: blur(5px); }
+  .story-map {
+    position: relative;
+    width: 100%;
+    height: 520px;
+    margin: 12px 0;
+    border-radius: 10px;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 28% 22%, rgba(150, 110, 60, 0.22), transparent 60%),
+      radial-gradient(circle at 75% 72%, rgba(60, 80, 120, 0.18), transparent 55%),
+      linear-gradient(160deg, #2a2418 0%, #1a1610 50%, #12100c 100%);
+    border: 1px solid rgba(200, 170, 110, 0.25);
+  }
+  .story-map svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .story-node {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    text-align: center;
+    z-index: 2;
+  }
+  .story-node .dot {
+    width: 46px; height: 46px;
+    margin: 0 auto;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 18px;
+    color: #ffe9b0;
+    background: radial-gradient(circle at 35% 30%, #6b4a2a, #2e1f10);
+    border: 2px solid rgba(255, 210, 120, 0.7);
+    box-shadow: 0 0 14px rgba(255, 190, 90, 0.35);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .story-node:hover .dot { transform: scale(1.18); box-shadow: 0 0 24px rgba(255, 210, 120, 0.75); }
+  .story-node .label {
+    margin-top: 6px;
+    font-size: 13px;
+    color: #e8d8b0;
+    white-space: nowrap;
+    text-shadow: 0 1px 3px #000;
+  }
+  .story-node .tag { font-size: 11px; color: #9a8560; }
+  .story-sub { font-size: 12px; color: #b9a6d6; letter-spacing: 0.12em; margin-top: 12px; text-align: left; }
+  .story-sub::before { content: "◆ "; color: #7b3fa0; }
   .map-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 18px; }
   .map-card {
     border: 1px solid rgba(140, 180, 150, 0.35);
@@ -658,6 +704,10 @@
     <div class="hud-label">暗流核心</div>
     <div class="hud-value small" id="coreHud">0</div>
   </div>
+  <div class="hud-panel" id="grenadePanel">
+    <div class="hud-label">手雷</div>
+    <div class="hud-value small" id="grenadeHud">×3</div>
+  </div>
 </div>
 
 <!-- ===== 撤离横幅 ===== -->
@@ -670,7 +720,7 @@
 
 <button id="ultBtnMobile" hidden>大招</button>
 
-<div id="hint">WASD / 方向键 移动 · 鼠标射击 · V 撤离 · Q 大招 · P 暂停</div>
+<div id="hint">WASD / 方向键 移动 · 鼠标射击 · 右键 丢手雷 · V 撤离 · Q 大招 · P 暂停</div>
 
 <!-- ===== 移动端虚拟方向键 ===== -->
 <div id="dpad">
@@ -710,6 +760,7 @@
       </div>
       <div class="home-start">
         <button class="btn start-mission" id="btnStart">开始任务</button>
+        <button class="btn" id="btnStory" style="margin-top:8px;background:linear-gradient(135deg,#4a1d5e,#7b3fa0);">剧情副本</button>
         <button class="btn" id="btnOnline" style="margin-top:8px;background:linear-gradient(135deg,#14532d,#1a7a3d);">联机对战</button>
         <div class="start-sub">常规免费 · 机密 5 核心 · 绝密 10 核心</div>
       </div>
@@ -778,6 +829,24 @@
     <div class="map-grid" id="mapCards"></div>
     <div class="map-foot">
       <button class="btn ghost" id="btnMapBack">返回主页</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 剧情副本（剧情战役入口） ===== -->
+<div class="overlay" id="overlayStory" hidden>
+  <div class="panel shop-panel">
+    <div class="shop-head">
+      <h2>剧情副本</h2>
+      <div class="core-balance">
+        <svg class="core-ico" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" transform="rotate(45 12 12)" fill="none" stroke="#ffd23f" stroke-width="2"/><circle cx="12" cy="12" r="2.5" fill="#ffd23f"/></svg>
+        <span id="coreStory">0</span>
+      </div>
+    </div>
+    <div class="story-sub">剧情战役 · 强制配装 · 完成目标获得核心奖励</div>
+    <div class="story-map" id="storyCards"></div>
+    <div class="map-foot">
+      <button class="btn ghost" id="btnStoryBack">返回主页</button>
     </div>
   </div>
 </div>
@@ -912,6 +981,7 @@ const evacFillEl = document.getElementById('evacFill');
 const overlayHome = document.getElementById('overlayHome');
 const overlayShop = document.getElementById('overlayShop');
 const overlayMap = document.getElementById('overlayMap');
+const overlayStory = document.getElementById('overlayStory');
 const overlayPause = document.getElementById('overlayPause');
 const overlayFail = document.getElementById('overlayFail');
 const overlayEvac = document.getElementById('overlayEvac');
@@ -1210,9 +1280,11 @@ const DIFFS = {
   normal: { id: 'normal', name: '常规', fee: 0,  mul: 1,   speedMul: 1,    enemyShoot: false,
             tag: '近身威胁', meta: '免费 · 奖励 ×1', desc: '敌人只能近身攻击，移动速度正常。' },
   secret: { id: 'secret', name: '机密', fee: 5,  mul: 1.5, speedMul: 1.25, enemyShoot: false,
-            tag: '高危行动', meta: '入场 5 核心 · 奖励 ×1.5', desc: '敌人移速稍快，仍只能近身攻击。' },
+            hazards: true,
+            tag: '高危行动', meta: '入场 5 核心 · 奖励 ×1.5', desc: '敌人移速稍快，会投掷手雷与埋设地雷。' },
   ultra:  { id: 'ultra',  name: '绝密', fee: 10, mul: 2,   speedMul: 1.25, enemyShoot: true,
-            tag: '绝密任务', meta: '入场 10 核心 · 奖励 ×2', desc: '敌人持枪射击，移速与机密相当。' }
+            hazards: true,
+            tag: '绝密任务', meta: '入场 10 核心 · 奖励 ×2', desc: '敌人持枪射击，会投掷手雷与埋设地雷。' }
 };
 let currentDiff = DIFFS.normal;
 
@@ -1308,6 +1380,7 @@ function sfxDeath() { if (actx) { noiseBurst(0.5, 500, 0.8); tone(0.45, 80, 0.6,
 function sfxUlt() { if (actx) { tone(0.3, 330, 0.45, 'sawtooth', 660); noiseBurst(0.4, 900, 0.5); } }
 function sfxSniper() { if (actx) { noiseBurst(0.32, 600, 0.85); tone(0.26, 120, 0.6, 'sawtooth', 48); } }
 function sfxRadio() { if (actx) { noiseBurst(0.1, 2200, 0.28, 'bandpass'); tone(0.07, 1350, 0.16, 'square', 900); } }
+function sfxGrenade() { if (actx) { noiseBurst(0.22, 900, 0.5); tone(0.18, 320, 0.3, 'triangle', 190); } }
 function sfxBomb() { if (actx) { noiseBurst(1.0, 180, 1.4); tone(0.9, 55, 1.1, 'sawtooth', 24); } }
 window.addEventListener('click', function () { initAudio(); }, { once: true });
 
@@ -1341,52 +1414,182 @@ const MAPS = {
     decors: ['wall', 'rubble', 'crate', 'lamp'],
     weather: 'rain', rainVol: 1,
     preview: 'linear-gradient(160deg, #4a5058 0%, #2e3238 60%, #1c1f23 100%)'
+  },
+  prison: {
+    id: 'prison', name: '战俘营', tag: '正午营救', story: true, big: true,
+    desc: '敌方战俘营关押着我方士兵。幽冥一号潜入营区，肃清守卫，营救战俘，炸毁敌军 88 毫米火炮。',
+    bgTop: '#8d9a7c', bgBot: '#4c5a40', grid: 'rgba(30,40,25,0.06)',
+    decors: ['crate', 'sandbag', 'barbed', 'watchtower'],
+    weather: 'sun', rainVol: 0,
+    preview: 'linear-gradient(160deg, #a8b48f 0%, #6d7a5c 55%, #45503a 100%)'
+  },
+  lab: {
+    id: 'lab', name: '深渊协议', tag: '生化研究所', story: true, big: true,
+    desc: '伪装成废弃矿场的生化研究所。幽冥一号潜入地下三百米，直面"幽冥计划"的源头。',
+    bgTop: '#3f4c44', bgBot: '#1a221d', grid: 'rgba(140,220,170,0.05)',
+    decors: ['pipe', 'pod', 'terminal', 'crate', 'hazard'],
+    weather: 'lab', rainVol: 0,
+    preview: 'linear-gradient(160deg, #4c5a52 0%, #2c3830 60%, #121a15 100%)'
+  },
+  sky: {
+    id: 'sky', name: '天穹塔', tag: '轨道电梯', story: true, big: true,
+    desc: '数据指向近地轨道。幽冥一号潜入天穹塔，切断敌方太空前哨的信号枢纽。',
+    bgTop: '#2c3a5e', bgBot: '#0e1526', grid: 'rgba(120,160,230,0.05)',
+    decors: ['crate', 'console', 'holo', 'towerlight'],
+    weather: 'night', rainVol: 0,
+    preview: 'linear-gradient(160deg, #3a4a7a 0%, #1a2440 60%, #0a1020 100%)'
+  },
+  zero: {
+    id: 'zero', name: '原爆点', tag: '幽冥原点', story: true, big: true,
+    desc: '一切开始的地方。幽冥一号回到幽冥计划的原点，终结这一切。',
+    bgTop: '#6b3a2a', bgBot: '#1f0f0a', grid: 'rgba(230,140,90,0.05)',
+    decors: ['crate', 'crack', 'ember', 'burntree'],
+    weather: 'ember', rainVol: 0,
+    preview: 'linear-gradient(160deg, #7a4030 0%, #3a1a12 60%, #120606 100%)'
+  },
+  finale: {
+    id: 'finale', name: '谢幕', tag: '谢幕', story: true,
+    desc: '幽冥一号返回指挥部领受勋章。这一晚，灯红酒绿之下，刀已出鞘。',
+    bgTop: '#3a2a1e', bgBot: '#140e0a', grid: 'rgba(220,180,120,0.05)',
+    decors: ['crate', 'maptable', 'flag', 'lamp'],
+    weather: 'warroom', rainVol: 0,
+    preview: 'linear-gradient(160deg, #4a3524 0%, #241812 60%, #0e0806 100%)'
   }
 };
 let currentMap = MAPS.trench;
 let mapTex = null;
 let mapDecors = [];
 let weatherDrops = [];
+/* ===== 大世界 / 摄像机（战俘营等大地图） ===== */
+let worldW = 0, worldH = 0, camX = 0, camY = 0;
+let aimWX = 400, aimWY = 300;
+function worldWidth() { return worldW || W; }
+function worldHeight() { return worldH || H; }
+function setupWorld() {
+  if (currentMap.big) {
+    worldW = Math.max(W, Math.round(W * 1.9));
+    worldH = Math.max(H, Math.round(H * 1.35));
+  } else { worldW = W; worldH = H; }
+  camX = 0; camY = 0;
+}
+function updateCam(dt) {
+  if (!currentMap.big) { camX = 0; camY = 0; return; }
+  let tx = player.x - W / 2, ty = player.y - H / 2;
+  tx = Math.max(0, Math.min(worldW - W, tx));
+  ty = Math.max(0, Math.min(worldH - H, ty));
+  camX += (tx - camX) * Math.min(1, dt * 8);
+  camY += (ty - camY) * Math.min(1, dt * 8);
+}
 
 function buildMapTexture() {
   const c = document.createElement('canvas');
-  c.width = W; c.height = H;
+  const cw = worldWidth(), ch = worldHeight();
+  c.width = cw; c.height = ch;
   const g = c.getContext('2d');
   const m = currentMap;
-  const grad = g.createLinearGradient(0, 0, 0, H);
+  const grad = g.createLinearGradient(0, 0, 0, ch);
   grad.addColorStop(0, m.bgTop);
   grad.addColorStop(1, m.bgBot);
   g.fillStyle = grad;
-  g.fillRect(0, 0, W, H);
-  const n = m.id === 'snow' ? 900 : 1400;
+  g.fillRect(0, 0, cw, ch);
+  const n = m.id === 'snow' ? 900 : (m.id === 'prison' ? 2200 : 1400);
   for (let i = 0; i < n; i++) {
     const l = 0.75 + Math.random() * 0.5;
     let rr, gg, bb;
     if (m.id === 'trench') { rr = 100 * l + 10; gg = 90 * l + 8; bb = 70 * l + 6; }
     else if (m.id === 'snow') { rr = 190 * l + 20; gg = 195 * l + 22; bb = 205 * l + 24; }
+    else if (m.id === 'prison') { rr = 140 * l + 26; gg = 150 * l + 30; bb = 108 * l + 22; }
+    else if (m.id === 'lab') { rr = 62 * l + 14; gg = 112 * l + 18; bb = 82 * l + 16; }
+    else if (m.id === 'sky') { rr = 70 * l + 14; gg = 96 * l + 18; bb = 160 * l + 26; }
+    else if (m.id === 'zero') { rr = 110 * l + 20; gg = 58 * l + 12; bb = 42 * l + 10; }
+    else if (m.id === 'finale') { rr = 80 * l + 16; gg = 55 * l + 10; bb = 40 * l + 8; }
     else { rr = 120 * l + 12; gg = 118 * l + 12; bb = 122 * l + 14; }
     g.fillStyle = 'rgba(' + (rr | 0) + ',' + (gg | 0) + ',' + (bb | 0) + ',' + (0.06 + Math.random() * 0.14).toFixed(2) + ')';
     g.beginPath();
-    g.arc(Math.random() * W, Math.random() * H, 3 + Math.random() * 26, 0, Math.PI * 2);
+    g.arc(Math.random() * cw, Math.random() * ch, 3 + Math.random() * 26, 0, Math.PI * 2);
     g.fill();
   }
   g.strokeStyle = m.grid;
   g.lineWidth = 1;
   g.beginPath();
-  for (let x = 0.5; x < W; x += 48) { g.moveTo(x, 0); g.lineTo(x, H); }
-  for (let y = 0.5; y < H; y += 48) { g.moveTo(0, y); g.lineTo(W, y); }
+  for (let x = 0.5; x < cw; x += 48) { g.moveTo(x, 0); g.lineTo(x, ch); }
+  for (let y = 0.5; y < ch; y += 48) { g.moveTo(0, y); g.lineTo(cw, y); }
   g.stroke();
+  // 战俘营：外圈围墙
+  if (m.id === 'prison') {
+    g.strokeStyle = 'rgba(45, 55, 38, 0.9)';
+    g.lineWidth = 6;
+    g.strokeRect(10, 10, cw - 20, ch - 20);
+    g.lineWidth = 2;
+    g.strokeStyle = 'rgba(200, 205, 180, 0.35)';
+    for (let x = 10; x < cw - 20; x += 26) {
+      g.beginPath(); g.moveTo(x, 10); g.lineTo(x - 8, 2); g.stroke();
+      g.beginPath(); g.moveTo(x, ch - 10); g.lineTo(x - 8, ch - 2); g.stroke();
+    }
+    for (let y = 10; y < ch - 20; y += 26) {
+      g.beginPath(); g.moveTo(10, y); g.lineTo(2, y - 8); g.stroke();
+      g.beginPath(); g.moveTo(cw - 10, y); g.lineTo(cw - 2, y - 8); g.stroke();
+    }
+  }
+  // 深渊协议：矿洞岩壁 + 实验舱格
+  if (m.id === 'lab') {
+    g.strokeStyle = 'rgba(16, 24, 19, 0.95)';
+    g.lineWidth = 10;
+    g.strokeRect(6, 6, cw - 12, ch - 12);
+    g.lineWidth = 3;
+    g.strokeStyle = 'rgba(96, 138, 108, 0.3)';
+    for (let x = 6; x < cw - 12; x += 22) {
+      g.beginPath(); g.moveTo(x, 6); g.lineTo(x - 6, 0); g.stroke();
+      g.beginPath(); g.moveTo(x, ch - 6); g.lineTo(x - 6, ch); g.stroke();
+    }
+    for (let y = 6; y < ch - 12; y += 22) {
+      g.beginPath(); g.moveTo(6, y); g.lineTo(0, y - 6); g.stroke();
+      g.beginPath(); g.moveTo(cw - 6, y); g.lineTo(cw, y - 6); g.stroke();
+    }
+    g.strokeStyle = 'rgba(110, 210, 150, 0.12)';
+    g.lineWidth = 2;
+    for (let i = 0; i < 24; i++) {
+      g.strokeRect(80 + Math.random() * (cw - 200), 80 + Math.random() * (ch - 200), 90, 54);
+    }
+  }
+  // 天穹塔：电梯井金属壁
+  if (m.id === 'sky') {
+    g.strokeStyle = 'rgba(20, 30, 55, 0.95)';
+    g.lineWidth = 10;
+    g.strokeRect(6, 6, cw - 12, ch - 12);
+    g.lineWidth = 2;
+    g.strokeStyle = 'rgba(120, 160, 230, 0.25)';
+    for (let i = 0; i < 18; i++) {
+      g.strokeRect(60 + Math.random() * (cw - 180), 60 + Math.random() * (ch - 180), 70, 44);
+    }
+  }
+  // 原爆点：焦土龟裂
+  if (m.id === 'zero') {
+    g.strokeStyle = 'rgba(30, 12, 8, 0.95)';
+    g.lineWidth = 10;
+    g.strokeRect(6, 6, cw - 12, ch - 12);
+    g.lineWidth = 2;
+    g.strokeStyle = 'rgba(180, 90, 50, 0.25)';
+    for (let i = 0; i < 22; i++) {
+      g.beginPath();
+      const cx0 = Math.random() * cw, cy0 = Math.random() * ch;
+      g.moveTo(cx0, cy0);
+      g.lineTo(cx0 + (Math.random() - 0.5) * 90, cy0 + (Math.random() - 0.5) * 90);
+      g.stroke();
+    }
+  }
   mapTex = c;
 }
 
 function initMapDecor() {
   mapDecors = [];
   const m = currentMap;
-  const n = 9;
+  const cw = worldWidth(), ch = worldHeight();
+  const n = m.big ? 22 : 9;
   for (let i = 0; i < n; i++) {
     mapDecors.push({
-      x: 60 + Math.random() * (W - 120),
-      y: 60 + Math.random() * (H - 120),
+      x: 60 + Math.random() * (cw - 120),
+      y: 60 + Math.random() * (ch - 120),
       rot: Math.random() * Math.PI,
       s: 0.7 + Math.random() * 0.8,
       kind: m.decors[Math.min(m.decors.length - 1, (Math.random() * m.decors.length) | 0)]
@@ -1402,6 +1605,36 @@ function initWeather() {
     for (let i = 0; i < count; i++) {
       weatherDrops.push({ x: Math.random() * W, y: Math.random() * H, sp: 30 + Math.random() * 50, r: 1.5 + Math.random() * 2.5, w: Math.random() * Math.PI * 2 });
     }
+  } else if (m.weather === 'sun') {
+    // 晴天：浮尘光斑
+    const count = 40;
+    for (let i = 0; i < count; i++) {
+      weatherDrops.push({ x: Math.random() * W, y: Math.random() * H, sp: 8 + Math.random() * 16, r: 1 + Math.random() * 2, w: Math.random() * Math.PI * 2, s: 0.15 + Math.random() * 0.3 });
+    }
+  } else if (m.weather === 'lab') {
+    // 地下实验室：绿色孢子微粒
+    const count = 46;
+    for (let i = 0; i < count; i++) {
+      weatherDrops.push({ x: Math.random() * W, y: Math.random() * H, sp: 12 + Math.random() * 18, r: 1.2 + Math.random() * 1.8, w: Math.random() * Math.PI * 2, s: 0.18 + Math.random() * 0.3 });
+    }
+  } else if (m.weather === 'night') {
+    // 天穹塔：星光
+    const count = 60;
+    for (let i = 0; i < count; i++) {
+      weatherDrops.push({ x: Math.random() * W, y: Math.random() * H, sp: 3 + Math.random() * 5, r: 0.8 + Math.random() * 1.6, w: Math.random() * Math.PI * 2, s: 0.25 + Math.random() * 0.55 });
+    }
+  } else if (m.weather === 'ember') {
+    // 原爆点：上浮余烬
+    const count = 55;
+    for (let i = 0; i < count; i++) {
+      weatherDrops.push({ x: Math.random() * W, y: Math.random() * H, sp: 26 + Math.random() * 32, r: 1.4 + Math.random() * 2.4, w: Math.random() * Math.PI * 2, s: 0.22 + Math.random() * 0.35 });
+    }
+  } else if (m.weather === 'warroom') {
+    // 指挥室：暖光尘粒
+    const count = 32;
+    for (let i = 0; i < count; i++) {
+      weatherDrops.push({ x: Math.random() * W, y: Math.random() * H, sp: 6 + Math.random() * 8, r: 0.8 + Math.random() * 1.5, w: Math.random() * Math.PI * 2, s: 0.1 + Math.random() * 0.25 });
+    }
   } else {
     const count = W < 560 ? 90 : 150;
     for (let i = 0; i < count; i++) {
@@ -1411,7 +1644,7 @@ function initWeather() {
 }
 
 function drawMapGround() {
-  if (mapTex) ctx.drawImage(mapTex, 0, 0, W, H);
+  if (mapTex) ctx.drawImage(mapTex, 0, 0, worldWidth(), worldHeight());
 }
 
 function drawWeather(dt) {
@@ -1427,6 +1660,99 @@ function drawWeather(dt) {
       ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
       ctx.fill();
     }
+  } else if (m.weather === 'sun') {
+    // 阳光尘粒 + 顶部暖光
+    for (const d of weatherDrops) {
+      d.y -= d.sp * dt;
+      d.x += Math.sin(d.w += 0.01) * 0.3;
+      if (d.y < -10) { d.y = H + 10; d.x = Math.random() * W; }
+      ctx.globalAlpha = d.s;
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff2cf';
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    const f = ctx.createLinearGradient(0, -H * 0.3, 0, H * 0.75);
+    f.addColorStop(0, 'rgba(255, 244, 205, 0.16)');
+    f.addColorStop(1, 'rgba(255, 244, 205, 0)');
+    ctx.fillStyle = f;
+    ctx.fillRect(0, 0, W, H);
+    // 太阳
+    const sx = W - 140 + camX, sy = 96 + camY;
+    const sg = ctx.createRadialGradient(sx, sy, 6, sx, sy, 90);
+    sg.addColorStop(0, 'rgba(255, 240, 190, 0.95)');
+    sg.addColorStop(0.35, 'rgba(255, 230, 160, 0.5)');
+    sg.addColorStop(1, 'rgba(255, 230, 160, 0)');
+    ctx.fillStyle = sg;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 90, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (m.weather === 'lab') {
+    // 地下冷光 + 漂浮孢子
+    for (const d of weatherDrops) {
+      d.y -= d.sp * dt;
+      d.x += Math.sin(d.w += 0.008) * 0.3;
+      if (d.y < -10) { d.y = H + 10; d.x = Math.random() * W; }
+      ctx.fillStyle = 'rgba(140, 255, 180, ' + d.s.toFixed(2) + ')';
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    const lf = ctx.createLinearGradient(0, 0, 0, H * 0.6);
+    lf.addColorStop(0, 'rgba(140, 255, 180, 0.08)');
+    lf.addColorStop(1, 'rgba(140, 255, 180, 0)');
+    ctx.fillStyle = lf;
+    ctx.fillRect(0, 0, W, H * 0.6);
+  } else if (m.weather === 'night') {
+    // 星空 + 冷蓝夜雾
+    for (const d of weatherDrops) {
+      d.x += Math.sin(d.w += 0.006) * 0.2;
+      d.y += Math.cos(d.w * 1.3) * 0.15;
+      const tw = 0.55 + Math.sin(performance.now() / 700 + d.w * 4) * 0.45;
+      ctx.fillStyle = 'rgba(200, 220, 255, ' + (d.s * tw).toFixed(2) + ')';
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    const nf = ctx.createLinearGradient(0, 0, 0, H);
+    nf.addColorStop(0, 'rgba(70, 110, 200, 0.12)');
+    nf.addColorStop(1, 'rgba(10, 16, 40, 0.06)');
+    ctx.fillStyle = nf;
+    ctx.fillRect(0, 0, W, H);
+  } else if (m.weather === 'ember') {
+    // 上浮余烬 + 橙红光晕
+    for (const d of weatherDrops) {
+      d.y -= d.sp * dt;
+      d.x += Math.sin(d.w += 0.012) * 0.5;
+      if (d.y < -10) { d.y = H + 10; d.x = Math.random() * W; }
+      const hot = 0.5 + Math.sin(d.w * 2) * 0.5;
+      ctx.fillStyle = 'rgba(255, ' + Math.round(110 + hot * 90) + ', 50, ' + d.s.toFixed(2) + ')';
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    const ef = ctx.createLinearGradient(0, 0, 0, H * 0.6);
+    ef.addColorStop(0, 'rgba(255, 110, 50, 0.10)');
+    ef.addColorStop(1, 'rgba(255, 110, 50, 0)');
+    ctx.fillStyle = ef;
+    ctx.fillRect(0, 0, W, H * 0.6);
+  } else if (m.weather === 'warroom') {
+    // 指挥室暖光 + 尘粒
+    for (const d of weatherDrops) {
+      d.y -= d.sp * dt;
+      d.x += Math.sin(d.w += 0.008) * 0.2;
+      if (d.y < -10) { d.y = H + 10; d.x = Math.random() * W; }
+      ctx.fillStyle = 'rgba(255, 220, 150, ' + d.s.toFixed(2) + ')';
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    const wf = ctx.createLinearGradient(0, 0, 0, H);
+    wf.addColorStop(0, 'rgba(255, 200, 120, 0.10)');
+    wf.addColorStop(1, 'rgba(255, 160, 80, 0.02)');
+    ctx.fillStyle = wf;
+    ctx.fillRect(0, 0, W, H);
   } else {
     ctx.strokeStyle = 'rgba(185, 205, 220, 0.30)';
     ctx.lineWidth = 1;
@@ -1482,6 +1808,105 @@ function drawMapDecor() {
       ctx.moveTo(-30, -26); ctx.lineTo(30, 26);
       ctx.moveTo(30, -26); ctx.lineTo(-30, 26);
       ctx.stroke();
+    } else if (k === 'console') {
+      ctx.fillStyle = '#1c2a3a';
+      ctx.fillRect(-22, -16, 44, 32);
+      ctx.fillStyle = 'rgba(120, 200, 255, 0.6)';
+      ctx.fillRect(-18, -12, 36, 10);
+      ctx.fillStyle = 'rgba(120, 200, 255, 0.25)';
+      ctx.fillRect(-18, 2, 36, 8);
+    } else if (k === 'holo') {
+      ctx.fillStyle = 'rgba(140, 200, 255, 0.35)';
+      ctx.beginPath();
+      ctx.arc(0, 0, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(180, 220, 255, 0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, 18, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, 10, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (k === 'towerlight') {
+      ctx.fillStyle = '#2a3a55';
+      ctx.fillRect(-4, -14, 8, 28);
+      ctx.fillStyle = 'rgba(255, 200, 90, 0.9)';
+      ctx.beginPath();
+      ctx.arc(0, -16, 4, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (k === 'maptable') {
+      ctx.fillStyle = '#2a1f14';
+      ctx.fillRect(-46, -28, 92, 56);
+      ctx.strokeStyle = 'rgba(200, 170, 110, 0.5)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(-46, -28, 92, 56);
+      ctx.strokeStyle = 'rgba(200, 120, 80, 0.4)';
+      ctx.beginPath();
+      ctx.moveTo(-36, -18); ctx.lineTo(-6, 4); ctx.lineTo(30, -14);
+      ctx.moveTo(-20, 18); ctx.lineTo(10, -4); ctx.lineTo(38, 10);
+      ctx.stroke();
+    } else if (k === 'flag') {
+      ctx.strokeStyle = '#1a120a';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, 20);
+      ctx.lineTo(0, -26);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(120, 40, 40, 0.85)';
+      ctx.beginPath();
+      ctx.moveTo(0, -26);
+      ctx.lineTo(28, -20);
+      ctx.lineTo(0, -12);
+      ctx.closePath();
+      ctx.fill();
+    } else if (k === 'lamp') {
+      ctx.fillStyle = '#20180e';
+      ctx.fillRect(-3, -10, 6, 30);
+      const lg = ctx.createRadialGradient(0, -14, 1, 0, -14, 26);
+      lg.addColorStop(0, 'rgba(255, 220, 150, 0.7)');
+      lg.addColorStop(1, 'rgba(255, 200, 120, 0)');
+      ctx.fillStyle = lg;
+      ctx.beginPath();
+      ctx.arc(0, -14, 26, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (k === 'crack') {
+      ctx.strokeStyle = 'rgba(30, 12, 8, 0.8)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-30, 0);
+      ctx.lineTo(-10, -6);
+      ctx.lineTo(8, 4);
+      ctx.lineTo(30, -2);
+      ctx.stroke();
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-5, 2);
+      ctx.lineTo(4, 14);
+      ctx.moveTo(10, 2);
+      ctx.lineTo(18, 12);
+      ctx.stroke();
+    } else if (k === 'ember') {
+      ctx.fillStyle = 'rgba(20, 10, 6, 0.9)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 16, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      const fl = 0.6 + Math.sin(performance.now() / 180 + d.x) * 0.4;
+      ctx.fillStyle = 'rgba(255, ' + Math.round(120 + fl * 100) + ', 50, ' + fl.toFixed(2) + ')';
+      ctx.beginPath();
+      ctx.arc(0, -4, 5 + fl * 3, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (k === 'burntree') {
+      ctx.strokeStyle = '#1a0e0a';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(0, 14);
+      ctx.lineTo(0, -18);
+      ctx.moveTo(0, -6);
+      ctx.lineTo(-12, -18);
+      ctx.moveTo(0, -10);
+      ctx.lineTo(12, -22);
+      ctx.stroke();
     } else if (k === 'sandbag') {
       ctx.fillStyle = '#6b5b3e';
       for (let i = 0; i < 5; i++) {
@@ -1504,6 +1929,18 @@ function drawMapDecor() {
         ctx.lineTo(14, -34 + i * 16);
         ctx.stroke();
       }
+    } else if (k === 'watchtower') {
+      // 岗楼
+      ctx.fillStyle = 'rgba(52, 62, 44, 0.95)';
+      ctx.fillRect(-5, -42, 10, 42);
+      ctx.fillStyle = 'rgba(74, 86, 60, 0.95)';
+      ctx.fillRect(-24, -52, 48, 14);
+      ctx.fillRect(-14, -44, 28, 6);
+      ctx.strokeStyle = 'rgba(20, 26, 16, 0.7)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(-24, -52, 48, 14);
+      ctx.fillStyle = 'rgba(45, 55, 38, 0.9)';
+      ctx.fillRect(-3, 0, 6, 10);
     } else if (k === 'snowbank') {
       ctx.fillStyle = 'rgba(235, 240, 248, 0.92)';
       ctx.beginPath();
@@ -1572,6 +2009,61 @@ function drawMapDecor() {
       ctx.arc(14, -26, 20, 0, Math.PI * 2);
       ctx.arc(-10, -30, 18, 0, Math.PI * 2);
       ctx.fill();
+    } else if (k === 'pipe') {
+      ctx.fillStyle = '#41524a';
+      ctx.fillRect(-70, -10, 140, 20);
+      ctx.fillStyle = '#2c3a33';
+      ctx.fillRect(-70, -10, 140, 6);
+      ctx.fillStyle = '#5a6e63';
+      ctx.fillRect(-42, -14, 14, 28);
+      ctx.fillRect(28, -14, 14, 28);
+      ctx.fillStyle = 'rgba(150, 220, 180, 0.5)';
+      ctx.fillRect(-58, -6, 8, 8);
+      ctx.fillRect(24, -6, 8, 8);
+    } else if (k === 'pod') {
+      ctx.fillStyle = '#28342e';
+      ctx.fillRect(-22, -34, 44, 68);
+      ctx.fillStyle = 'rgba(120, 235, 165, 0.22)';
+      ctx.fillRect(-15, -28, 30, 52);
+      ctx.strokeStyle = 'rgba(150, 240, 185, 0.55)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(-15, -28, 30, 52);
+      ctx.fillStyle = 'rgba(140, 255, 180, 0.8)';
+      ctx.fillRect(-15, 8, 30, 16);
+      ctx.fillStyle = '#0f1713';
+      ctx.fillRect(-22, 34, 44, 8);
+    } else if (k === 'terminal') {
+      ctx.fillStyle = '#202b25';
+      ctx.fillRect(-22, -28, 44, 56);
+      ctx.fillStyle = 'rgba(120, 255, 170, 0.35)';
+      ctx.fillRect(-16, -22, 32, 24);
+      ctx.strokeStyle = 'rgba(140, 255, 180, 0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(-16, -22, 32, 24);
+      ctx.fillStyle = '#0d1812';
+      ctx.fillRect(-16, -22, 32, 5);
+      ctx.fillStyle = '#3d4f45';
+      ctx.fillRect(-16, 6, 32, 8);
+      ctx.fillRect(-16, 18, 32, 4);
+    } else if (k === 'hazard') {
+      ctx.fillStyle = '#b3a21a';
+      ctx.beginPath();
+      ctx.ellipse(0, 6, 16, 20, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#3a3408';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.ellipse(0, 6, 16, 20, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = '#3a3408';
+      ctx.beginPath();
+      ctx.arc(0, 6, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#3a3408';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 6, 9, 0.6, Math.PI - 0.6);
+      ctx.stroke();
     }
     ctx.restore();
   }
@@ -1582,6 +2074,7 @@ function renderMapCards() {
   let html = '';
   Object.keys(MAPS).forEach(function (id) {
     const m = MAPS[id];
+    if (m.story) return; // 剧情地图归入「剧情副本」
     const sel = currentMap.id === id ? ' style="border-color:#ffd23f;background:rgba(30,26,10,0.85);"' : '';
     html += '<div class="map-card" data-map="' + id + '"' + sel + '>'
       + '<div class="map-preview" style="background:' + m.preview + ';"></div>'
@@ -1595,10 +2088,56 @@ function renderMapCards() {
     card.addEventListener('click', function () {
       currentMap = MAPS[card.dataset.map];
       renderMapCards();
-      if (currentMap.story) startStoryGame();
-      else startMission();
+      startMission();
     });
   });
+}
+
+/* ===== 剧情副本（剧情战役入口） ===== */
+function renderStoryCards() {
+  const wrap = document.getElementById('storyCards');
+  const order = ['admin', 'prison', 'lab', 'sky', 'zero', 'finale'];
+  const pos = {
+    admin:  { x: 16, y: 22 },
+    prison: { x: 34, y: 54 },
+    lab:    { x: 22, y: 82 },
+    sky:    { x: 72, y: 18 },
+    zero:   { x: 80, y: 52 },
+    finale: { x: 58, y: 86 }
+  };
+  let pathD = '';
+  order.forEach(function (id, i) {
+    const p = pos[id];
+    pathD += (i === 0 ? 'M' : 'L') + p.x + ' ' + p.y + ' ';
+  });
+  let html = '<svg viewBox="0 0 100 100" preserveAspectRatio="none">'
+    + '<path d="' + pathD + '" fill="none" stroke="rgba(255,210,130,0.35)" stroke-width="0.6" stroke-dasharray="2,1.6"/>'
+    + '</svg>';
+  order.forEach(function (id, i) {
+    const m = MAPS[id];
+    if (!m) return;
+    const p = pos[id];
+    html += '<div class="story-node" data-map="' + id + '" style="left:' + p.x + '%;top:' + p.y + '%;">'
+      + '<div class="dot">' + (i + 1) + '</div>'
+      + '<div class="label">' + m.name + '</div>'
+      + '<div class="tag">' + m.tag + '</div>'
+      + '</div>';
+  });
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('.story-node').forEach(function (node) {
+    node.addEventListener('click', function () {
+      currentMap = MAPS[node.dataset.map];
+      startStoryGame();
+    });
+  });
+}
+
+function openStorySelect() {
+  renderStoryCards();
+  syncCoreDisplays();
+  stopRain();
+  overlayHome.hidden = true;
+  overlayStory.hidden = false;
 }
 
 function openMapSelect() {
@@ -1628,6 +2167,39 @@ let storyBossSpawned = false;
 let storyDialogLines = [];
 let storyDialogIdx = 0;
 let storyDialogAfter = null;
+/* 战俘营剧情 */
+let storyStage = null;          // gate | major | rescue | ambush | radio | cannon | bombed
+let prisonKills = 0;
+let prisonKillsNeeded = 10;
+let ambushKills = 0;
+let majorSpawned = false;
+let ambushSpawned = false;
+let cannonPos = { x: 0, y: 0 };
+let allies = [];
+/* 深渊协议（地下实验室）剧情 */
+let labKills = 0;
+let labKillsNeeded = 8;
+let labKills2 = 0;
+let labKills2Needed = 10;
+let labTimer = 45;
+let labChoice = '';
+let labBossSpawned = false;
+let dataCorePos = { x: 0, y: 0 };
+/* 天穹塔剧情 */
+let skyKills = 0, skyKillsNeeded = 8;
+let skyKills2 = 0, skyKills2Needed = 10;
+let skyTimer = 60;
+let skyBossSpawned = false;
+let antennaPos = { x: 0, y: 0 };
+/* 原爆点剧情 */
+let zeroKills = 0, zeroKillsNeeded = 10;
+let zeroKills2 = 0, zeroKills2Needed = 10;
+let zeroTimer = 40;
+let zeroBossSpawned = false;
+/* 谢幕大结局剧情 */
+let finaleKills = 0, finaleKillsNeeded = 8;
+let finaleKills2 = 0, finaleKills2Needed = 10;
+let finaleBossSpawned = false;
 
 const player = { x: 0, y: 0, size: 20, speed: 285, hp: 100, invincible: 0 };
 const bullets = [];
@@ -1643,10 +2215,18 @@ let elapsed = 0;
 let spawnTimer = 0;
 let shake = 0;
 let flash = 0;
+/* 手雷 / 地雷 */
+let playerGrenades = 3;
+let grenadeCooldown = 0;
+const grenades = [];        // 玩家投掷的手雷
+const enemyGrenades = [];   // 敌军投掷的手雷
+const mines = [];           // 敌军埋设的地雷
+let mineTimer = 6;
 
 function clampPlayer() {
-  player.x = Math.max(player.size, Math.min(W - player.size, player.x));
-  player.y = Math.max(player.size, Math.min(H - player.size, player.y));
+  const cw = worldWidth(), ch = worldHeight();
+  player.x = Math.max(player.size, Math.min(cw - player.size, player.x));
+  player.y = Math.max(player.size, Math.min(ch - player.size, player.y));
 }
 
 /* ===== 难度曲线 ===== */
@@ -1656,24 +2236,99 @@ function enemySpeed() { return (55 + Math.min(175, elapsed * 2.2)) * currentDiff
 /* ===== 生成敌人 ===== */
 function spawnEnemy() {
   if (net.playing) return; // 联机局不刷敌人
-  if (storyMode && storyBossSpawned) return; // 上校登场后不再刷守卫
+  if (storyMode && currentMap.id === 'admin' && storyBossSpawned) return; // 上校登场后不再刷守卫
+  if (storyMode && currentMap.id === 'prison') {
+    // 战俘营：只在「大门」阶段持续刷守卫，其余阶段由剧情函数生成
+    if (storyStage !== 'gate') return;
+  }
+  if (storyMode && currentMap.id === 'lab') {
+    // 深渊协议：潜入/收容阶段刷敌人，核心与数据阶段由剧情函数生成
+    if (storyStage !== 'infiltrate' && storyStage !== 'holding') return;
+  }
+  if (storyMode && currentMap.id === 'sky') {
+    // 天穹塔：基座/电梯井阶段刷敌人，塔顶与天线阶段由剧情函数生成
+    if (storyStage !== 'gate' && storyStage !== 'shaft') return;
+  }
+  if (storyMode && currentMap.id === 'zero') {
+    // 原爆点：焦土/深坑阶段刷敌人，核心阶段由剧情函数生成
+    if (storyStage !== 'gate' && storyStage !== 'pit') return;
+  }
+  if (storyMode && currentMap.id === 'finale') {
+    // 谢幕：近卫/追兵阶段刷敌人，对决阶段由剧情函数生成
+    if (storyStage !== 'betray' && storyStage !== 'pursue') return;
+  }
   if (enemies.length >= 42) return;
+  const cw = worldWidth(), ch = worldHeight();
   const pad = 24;
   const side = Math.floor(Math.random() * 4);
   let ex, ey;
-  if (side === 0)      { ex = pad + Math.random() * (W - pad * 2); ey = -pad; }
-  else if (side === 1) { ex = W + pad; ey = pad + Math.random() * (H - pad * 2); }
-  else if (side === 2) { ex = pad + Math.random() * (W - pad * 2); ey = H + pad; }
-  else                 { ex = -pad; ey = pad + Math.random() * (H - pad * 2); }
+  if (side === 0)      { ex = pad + Math.random() * (cw - pad * 2); ey = -pad; }
+  else if (side === 1) { ex = cw + pad; ey = pad + Math.random() * (ch - pad * 2); }
+  else if (side === 2) { ex = pad + Math.random() * (cw - pad * 2); ey = ch + pad; }
+  else                 { ex = -pad; ey = pad + Math.random() * (ch - pad * 2); }
   enemies.push({
     x: ex, y: ey, size: 17 + Math.random() * 5, speed: enemySpeed(), ang: 0,
     shootT: 1.2 + Math.random() * 1.6,
     hp: 20, maxHp: 20, hitFlash: 0, frozen: 0
   });
-  if (storyMode && !storyBossSpawned) {
+  if (storyMode && currentMap.id === 'admin' && !storyBossSpawned) {
     const se = enemies[enemies.length - 1];
     se.hp = se.maxHp = 26;
     se.shootT = 0.4 + Math.random() * 0.6; // AKM 首射快
+  } else if (storyMode && currentMap.id === 'prison' && storyStage === 'gate') {
+    const se = enemies[enemies.length - 1];
+    se.hp = se.maxHp = 26;
+    se.shootT = 0.4 + Math.random() * 0.6; // AKM 连发
+  } else if (storyMode && currentMap.id === 'lab') {
+    const se = enemies[enemies.length - 1];
+    if (storyStage === 'infiltrate') {
+      if (Math.random() < 0.4) {
+        se.kind = 'sniper';      // 狙击手：远距高伤快弹
+        se.hp = se.maxHp = 34;
+        se.size = 19;
+        se.speed = 26;
+        se.shootT = 1.6 + Math.random() * 1.2;
+      } else {
+        se.kind = 'guard';       // 矿场巡逻兵
+        se.hp = se.maxHp = 26;
+        se.shootT = 0.5 + Math.random() * 0.6;
+      }
+    } else if (storyStage === 'holding') {
+      se.kind = 'mutant';        // 实验体：高速近战
+      se.hp = se.maxHp = 42;
+      se.size = 23;
+      se.speed = 128 + Math.random() * 30;
+      se.shootT = 999;
+    }
+  } else if (storyMode && currentMap.id === 'sky') {
+    const se = enemies[enemies.length - 1];
+    if (storyStage === 'gate') {
+      if (Math.random() < 0.4) {
+        se.kind = 'sentry';      // 哨兵：远距快弹
+        se.hp = se.maxHp = 30; se.size = 18; se.speed = 30; se.shootT = 1.5 + Math.random();
+      } else {
+        se.kind = 'guard'; se.hp = se.maxHp = 26; se.shootT = 0.5 + Math.random() * 0.6;
+      }
+    } else if (storyStage === 'shaft') {
+      if (Math.random() < 0.5) {
+        se.kind = 'drone';       // 无人机：浮游快射
+        se.hp = se.maxHp = 20; se.size = 15; se.speed = 120; se.shootT = 0.55;
+      } else {
+        se.kind = 'sentry'; se.hp = se.maxHp = 32; se.size = 18; se.speed = 30; se.shootT = 1.4 + Math.random();
+      }
+    }
+  } else if (storyMode && currentMap.id === 'zero') {
+    const se = enemies[enemies.length - 1];
+    if (storyStage === 'gate') {
+      se.kind = 'elite';         // 精英守卫：强火力
+      se.hp = se.maxHp = 38; se.shootT = 0.3 + Math.random() * 0.3;
+    } else if (storyStage === 'pit') {
+      se.kind = 'alpha';         // 强化实验体：更快近战
+      se.hp = se.maxHp = 48; se.size = 24; se.speed = 150 + Math.random() * 30; se.shootT = 999;
+    }
+  } else if (storyMode && currentMap.id === 'finale') {
+    const se = enemies[enemies.length - 1];
+    se.kind = 'guard'; se.hp = se.maxHp = 30; se.shootT = 0.4 + Math.random() * 0.4;
   }
 }
 
@@ -1693,8 +2348,181 @@ function burst(x, y, color, n) {
 }
 
 /* ===== 射击 ===== */
+/* ===== 手雷 / 地雷系统 ===== */
+function throwGrenade() {
+  if (status !== 'playing' || net.playing) return;
+  if (grenadeCooldown > 0) return;
+  if (playerGrenades <= 0) { toast('手雷用完了！'); return; }
+  playerGrenades--;
+  grenadeCooldown = 0.45;
+  updateHUD();
+  const ang = Math.atan2(aimWY - player.y, aimWX - player.x);
+  grenades.push({
+    x: player.x + Math.cos(ang) * 20,
+    y: player.y + Math.sin(ang) * 20,
+    vx: Math.cos(ang) * 470,
+    vy: Math.sin(ang) * 470,
+    targetX: aimWX, targetY: aimWY,
+    fuse: 0.9
+  });
+  sfxGrenade();
+}
+
+function killEnemyByExplosion(idx, e) {
+  enemies.splice(idx, 1);
+  score += 10;
+  sfxKill();
+  burst(e.x, e.y, '#ffd23f', 12);
+  burst(e.x, e.y, '#b33636', 10);
+  if (healOnKill > 0 && player.hp > 0) {
+    player.hp = Math.min(maxHp, player.hp + healOnKill);
+  }
+  if (storyMode && currentMap.id === 'admin') {
+    if (!storyBossSpawned) {
+      storyKills++;
+      elDiffName.innerText = '剧情 · 行政大厅 肃清 ' + storyKills + '/' + storyKillsNeeded;
+      if (storyKills >= storyKillsNeeded) triggerBossEvent();
+    } else if (e.boss) {
+      showStoryDialog('幽冥一号', '幽冥……一号，任务完成。', false, function () { gameOver(true); });
+    }
+  } else if (storyMode && currentMap.id === 'prison') {
+    prisonOnEnemyKilled(e);
+  } else if (storyMode && currentMap.id === 'lab') {
+    labOnEnemyKilled(e);
+  } else if (storyMode && currentMap.id === 'sky') {
+    skyOnEnemyKilled(e);
+  } else if (storyMode && currentMap.id === 'zero') {
+    zeroOnEnemyKilled(e);
+  } else if (storyMode && currentMap.id === 'finale') {
+    finaleOnEnemyKilled(e);
+  }
+  updateHUD();
+}
+
+// mode: 'player' 玩家手雷（炸敌人） | 'enemy' 敌手雷 / 'mine' 地雷（炸玩家）
+function explodeGrenade(x, y, mode) {
+  burst(x, y, '#ff8a50', 34);
+  burst(x, y, '#ffd23f', 22);
+  burst(x, y, '#3a3a3a', 18);
+  shake = Math.max(shake, 0.55);
+  sfxBomb();
+  if (mode === 'player') {
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const e = enemies[i];
+      if (Math.hypot(e.x - x, e.y - y) < 165) {
+        e.hp -= 220;
+        e.hitFlash = 1;
+        if (e.hp <= 0) killEnemyByExplosion(i, e);
+      }
+    }
+  } else {
+    if (Math.hypot(player.x - x, player.y - y) < 150 && status === 'playing') {
+      damagePlayer(mode === 'enemy' ? 22 : 30, x, y);
+    }
+  }
+}
+
+function updateGrenades(dt) {
+  // 玩家手雷
+  for (let i = grenades.length - 1; i >= 0; i--) {
+    const g = grenades[i];
+    const dx = g.targetX - g.x, dy = g.targetY - g.y;
+    const dist = Math.hypot(dx, dy);
+    let exploded = false;
+    if (dist > 14) {
+      g.x += (dx / dist) * 470 * dt;
+      g.y += (dy / dist) * 470 * dt;
+      // 飞行中碰到敌人立即爆炸
+      for (const e of enemies) {
+        if (Math.hypot(e.x - g.x, e.y - g.y) < e.size + 9) {
+          grenades.splice(i, 1);
+          explodeGrenade(g.x, g.y, 'player');
+          exploded = true;
+          break;
+        }
+      }
+    } else {
+      g.fuse -= dt;
+      if (g.fuse <= 0) {
+        grenades.splice(i, 1);
+        explodeGrenade(g.x, g.y, 'player');
+        exploded = true;
+      }
+    }
+    if (exploded) continue;
+  }
+  // 敌军手雷
+  for (let i = enemyGrenades.length - 1; i >= 0; i--) {
+    const g = enemyGrenades[i];
+    const dx = g.targetX - g.x, dy = g.targetY - g.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 14) {
+      g.x += (dx / dist) * 250 * dt;
+      g.y += (dy / dist) * 250 * dt;
+    } else {
+      g.fuse -= dt;
+      if (g.fuse <= 0) {
+        enemyGrenades.splice(i, 1);
+        explodeGrenade(g.x, g.y, 'enemy');
+      }
+    }
+  }
+}
+
+function updateMines(dt) {
+  if (currentDiff.hazards && !net.playing && !storyMode) {
+    mineTimer -= dt;
+    if (mineTimer <= 0) {
+      mineTimer = 8 + Math.random() * 6;
+      if (mines.length < 8) {
+        const cw = worldWidth(), ch = worldHeight();
+        const a = Math.random() * Math.PI * 2;
+        const d = 350 + Math.random() * 320;
+        mines.push({
+          x: Math.max(30, Math.min(cw - 30, player.x + Math.cos(a) * d)),
+          y: Math.max(30, Math.min(ch - 30, player.y + Math.sin(a) * d))
+        });
+      }
+    }
+  }
+  // 踩雷
+  for (let i = mines.length - 1; i >= 0; i--) {
+    const m = mines[i];
+    if (Math.hypot(player.x - m.x, player.y - m.y) < 17) {
+      mines.splice(i, 1);
+      flash = Math.max(flash, 0.5);
+      explodeGrenade(m.x, m.y, 'mine');
+    }
+  }
+}
+
+function drawGrenades() {
+  for (const g of grenades) {
+    ctx.fillStyle = '#2f7a2f';
+    ctx.beginPath(); ctx.arc(g.x, g.y, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#1c4f1c'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#e8e0c8';
+    ctx.fillRect(g.x - 2, g.y - 4, 4, 3);
+  }
+  for (const g of enemyGrenades) {
+    ctx.fillStyle = '#8a2f2f';
+    ctx.beginPath(); ctx.arc(g.x, g.y, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#4f1c1c'; ctx.lineWidth = 2; ctx.stroke();
+  }
+}
+
+function drawMines() {
+  for (const m of mines) {
+    ctx.fillStyle = 'rgba(44,48,38,0.92)';
+    ctx.beginPath(); ctx.ellipse(m.x, m.y, 8, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(190,200,180,0.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = 'rgba(150,35,30,0.9)';
+    ctx.beginPath(); ctx.arc(m.x, m.y - 2, 2.4, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
 function shootAt(tx, ty) {
-  aimX = tx; aimY = ty;
+  aimWX = tx; aimWY = ty;
   const baseAng = Math.atan2(ty - player.y, tx - player.x);
   const pellets = playerPellets || 1;
   for (let p = 0; p < pellets; p++) {
@@ -1783,12 +2611,61 @@ function update(dt) {
     player.y += dy / len * player.speed * dt;
     clampPlayer();
   }
+  updateCam(dt);
+
+  // 战俘营：爆破火炮（按 F）
+  if (storyMode && currentMap.id === 'prison' && storyStage === 'cannon' && keys['f']) {
+    const dCannon = Math.hypot(player.x - cannonPos.x, player.y - cannonPos.y);
+    if (dCannon < 110) {
+      keys['f'] = false;
+      bombCannon();
+    } else {
+      toast('靠近 88 毫米火炮再按 F 爆破！');
+    }
+  }
+
+  // 战俘营：友军行动
+  if (storyMode && currentMap.id === 'prison' && allies.length > 0) updateAllies(dt);
+
+  // 深渊协议：核心实验室氧气限时
+  if (storyMode && currentMap.id === 'lab' && storyStage === 'core') {
+    labTimer -= dt;
+    elDiffName.innerText = '剧情 · 深渊协议 氧气 ' + Math.max(0, Math.ceil(labTimer)) + 's · 消灭原型体';
+    if (labTimer <= 0) {
+      toast('氧气耗尽……');
+      sfxDeath();
+      gameOver(false);
+      return;
+    }
+  }
+  // 天穹塔：电梯上行倒计时
+  if (storyMode && currentMap.id === 'sky' && storyStage === 'top') {
+    skyTimer -= dt;
+    elDiffName.innerText = '剧情 · 天穹塔 电梯上行 ' + Math.max(0, Math.ceil(skyTimer)) + 's · 消灭指挥官';
+    if (skyTimer <= 0) {
+      toast('电梯停运……');
+      sfxDeath();
+      gameOver(false);
+      return;
+    }
+  }
+  // 原爆点：核心过载
+  if (storyMode && currentMap.id === 'zero' && storyStage === 'core') {
+    zeroTimer -= dt;
+    elDiffName.innerText = '剧情 · 原爆点 核心过载 ' + Math.max(0, Math.ceil(zeroTimer)) + 's · 消灭零号原型';
+    if (zeroTimer <= 0) {
+      toast('核心熔毁……');
+      sfxDeath();
+      gameOver(false);
+      return;
+    }
+  }
 
   // 射击（全自动武器）
   if (firing) {
     fireCooldown -= dt;
     const interval = rageTimer > 0 ? playerFireInterval / 1.8 : playerFireInterval;
-    if (fireCooldown <= 0) { shootAt(aimX, aimY); fireCooldown = interval; }
+    if (fireCooldown <= 0) { shootAt(aimWX, aimWY); fireCooldown = interval; }
   }
 
   // 敌人生成
@@ -1799,16 +2676,23 @@ function update(dt) {
   }
 
   // 子弹
+  const cwB = worldWidth(), chB = worldHeight();
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
     b.x += b.vx * dt;
     b.y += b.vy * dt;
-    if (b.x < -20 || b.x > W + 20 || b.y < -20 || b.y > H + 20) bullets.splice(i, 1);
+    if (b.x < -20 || b.x > cwB + 20 || b.y < -20 || b.y > chB + 20) bullets.splice(i, 1);
   }
+
+  // 手雷 / 地雷
+  if (grenadeCooldown > 0) grenadeCooldown -= dt;
+  updateGrenades(dt);
+  updateMines(dt);
 
   // 敌人
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
+    if (!e) continue;
     if (e.hitFlash > 0) e.hitFlash = Math.max(0, e.hitFlash - dt * 6);
     const ang = Math.atan2(player.y - e.y, player.x - e.x);
     e.ang = ang;
@@ -1816,23 +2700,62 @@ function update(dt) {
       e.frozen -= dt;
     } else {
       const slowMul = slowTimer > 0 ? 0.5 : 1;
-      e.x += Math.cos(ang) * e.speed * slowMul * dt;
-      e.y += Math.sin(ang) * e.speed * slowMul * dt;
+      if (e.kind === 'sniper') {
+        const sd = Math.hypot(player.x - e.x, player.y - e.y);
+        if (sd < 400) { e.x -= Math.cos(ang) * e.speed * 1.7 * slowMul * dt; e.y -= Math.sin(ang) * e.speed * 1.7 * slowMul * dt; }
+        else { e.x += Math.cos(ang) * e.speed * slowMul * dt; e.y += Math.sin(ang) * e.speed * slowMul * dt; }
+      } else if (e.kind === 'drone') {
+        e.wob = (e.wob || 0) + dt * 3.2;
+        e.x += Math.cos(ang) * e.speed * dt + Math.sin(e.wob) * 46 * dt;
+        e.y += Math.sin(ang) * e.speed * dt + Math.cos(e.wob * 1.3) * 34 * dt;
+      } else {
+        e.x += Math.cos(ang) * e.speed * slowMul * dt;
+        e.y += Math.sin(ang) * e.speed * slowMul * dt;
+      }
 
-      // 敌人开枪：绝密难度 / BOSS / 剧情守卫(AKM 连发)
-      if (currentDiff.enemyShoot || e.boss || storyMode) {
+      // 敌人开枪：绝密难度 / BOSS / 剧情守卫(AKM 连发)；实验体为近战不射击
+      if ((currentDiff.enemyShoot || e.boss || storyMode) && e.kind !== 'mutant') {
         e.shootT -= dt;
         if (e.shootT <= 0) {
-          const isGuard = storyMode && !e.boss;
-          e.shootT = isGuard ? 0.26 + Math.random() * 0.3 : 1.6 + Math.random() * 1.4;
-          const spread = isGuard ? (Math.random() - 0.5) * 0.1 : 0;
+          const isGuard = storyMode && !e.boss && e.kind !== 'sniper' && e.kind !== 'prototype' && e.kind !== 'sentry' && e.kind !== 'drone' && e.kind !== 'commander' && e.kind !== 'elite' && e.kind !== 'prime' && e.kind !== 'general';
+          let bspd = 300, bsize = 4, bdmg = 12, bshoot = 1.6 + Math.random() * 1.4;
+          if (e.kind === 'sniper') { bspd = 740; bsize = 5; bdmg = 16; bshoot = 2.2 + Math.random() * 1.2; }
+          else if (e.kind === 'prototype') { bspd = 430; bsize = 7; bdmg = 18; bshoot = 1.0 + Math.random() * 0.5; }
+          else if (e.kind === 'sentry') { bspd = 680; bsize = 5; bdmg = 14; bshoot = 1.8 + Math.random(); }
+          else if (e.kind === 'drone') { bspd = 380; bsize = 4; bdmg = 8; bshoot = 0.5 + Math.random() * 0.3; }
+          else if (e.kind === 'commander') { bspd = 460; bsize = 7; bdmg = 18; bshoot = 0.9 + Math.random() * 0.4; }
+          else if (e.kind === 'elite') { bspd = 360; bsize = 5; bdmg = 13; bshoot = 0.32 + Math.random() * 0.25; }
+          else if (e.kind === 'prime') { bspd = 480; bsize = 8; bdmg = 20; bshoot = 0.85 + Math.random() * 0.3; }
+          else if (e.kind === 'general') { bspd = 500; bsize = 8; bdmg = 20; bshoot = 0.8 + Math.random() * 0.3; }
+          else if (isGuard) { bspd = 340; bshoot = 0.26 + Math.random() * 0.3; }
+          e.shootT = bshoot;
+          const spread = isGuard ? (Math.random() - 0.5) * 0.1 : ((e.kind === 'sniper' || e.kind === 'sentry') ? (Math.random() - 0.5) * 0.05 : 0);
           enemyBullets.push({
             x: e.x + Math.cos(ang) * (e.size + 4),
             y: e.y + Math.sin(ang) * (e.size + 4),
-            vx: Math.cos(ang + spread) * (isGuard ? 340 : 300),
-            vy: Math.sin(ang + spread) * (isGuard ? 340 : 300),
-            size: 4
+            vx: Math.cos(ang + spread) * bspd,
+            vy: Math.sin(ang + spread) * bspd,
+            size: bsize, dmg: bdmg
           });
+        }
+      }
+
+      // 敌军投掷手雷（机密 / 绝密）
+      if (currentDiff.hazards && !storyMode && !net.playing) {
+        e.grenT = (e.grenT == null ? 2.5 + Math.random() * 4 : e.grenT) - dt;
+        if (e.grenT <= 0) {
+          e.grenT = 3.5 + Math.random() * 4;
+          const gd = Math.hypot(player.x - e.x, player.y - e.y);
+          if (gd > 240 && gd < 780) {
+            enemyGrenades.push({
+              x: e.x + Math.cos(ang) * (e.size + 6),
+              y: e.y + Math.sin(ang) * (e.size + 6),
+              vx: Math.cos(ang) * 250,
+              vy: Math.sin(ang) * 250,
+              targetX: player.x, targetY: player.y,
+              fuse: 1.0
+            });
+          }
         }
       }
     }
@@ -1840,10 +2763,10 @@ function update(dt) {
     // 碰到玩家
     if (Math.hypot(e.x - player.x, e.y - player.y) < e.size + player.size - 3) {
       if (player.invincible <= 0 && shieldTimer <= 0) {
-        damagePlayer(20, e.x, e.y);
+        damagePlayer(e.kind === 'mutant' ? 15 : (e.kind === 'alpha' ? 18 : ((e.kind === 'sniper' || e.kind === 'sentry' || e.kind === 'drone') ? 10 : 20)), e.x, e.y);
         if (status !== 'playing') return;
       }
-      enemies.splice(i, 1);
+      if (!e.boss) enemies.splice(i, 1);
       continue;
     }
 
@@ -1853,7 +2776,7 @@ function update(dt) {
       if (Math.hypot(e.x - b.x, e.y - b.y) < e.size + b.size) {
         bullets.splice(j, 1);
         let dmgNow = b.dmg;
-        if (storyMode && !e.boss) dmgNow = Math.round(dmgNow * 0.75);
+        if (storyMode && !e.boss && !b.ally) dmgNow = Math.round(dmgNow * 0.75);
         e.hp -= dmgNow;
         e.hitFlash = 1;
         sfxHit();
@@ -1867,13 +2790,24 @@ function update(dt) {
           if (healOnKill > 0 && player.hp > 0) {
             player.hp = Math.min(maxHp, player.hp + healOnKill);
           }
-          if (storyMode && !storyBossSpawned) {
-            storyKills++;
-            elDiffName.innerText = '剧情 · 行政大厅 肃清 ' + storyKills + '/' + storyKillsNeeded;
-            if (storyKills >= storyKillsNeeded) triggerBossEvent();
-          }
-          if (storyMode && e.boss) {
-            showStoryDialog('幽冥一号', '幽冥……一号，任务完成。', false, function () { gameOver(true); });
+          if (storyMode && currentMap.id === 'admin') {
+            if (!storyBossSpawned) {
+              storyKills++;
+              elDiffName.innerText = '剧情 · 行政大厅 肃清 ' + storyKills + '/' + storyKillsNeeded;
+              if (storyKills >= storyKillsNeeded) triggerBossEvent();
+            } else if (e.boss) {
+              showStoryDialog('幽冥一号', '幽冥……一号，任务完成。', false, function () { gameOver(true); });
+            }
+          } else if (storyMode && currentMap.id === 'prison') {
+            prisonOnEnemyKilled(e);
+          } else if (storyMode && currentMap.id === 'lab') {
+            labOnEnemyKilled(e);
+          } else if (storyMode && currentMap.id === 'sky') {
+            skyOnEnemyKilled(e);
+          } else if (storyMode && currentMap.id === 'zero') {
+            zeroOnEnemyKilled(e);
+          } else if (storyMode && currentMap.id === 'finale') {
+            finaleOnEnemyKilled(e);
           }
           updateHUD();
         }
@@ -1901,18 +2835,19 @@ function update(dt) {
   }
 
   // 敌弹
+  const cwE = worldWidth(), chE = worldHeight();
   for (let i = enemyBullets.length - 1; i >= 0; i--) {
     const eb = enemyBullets[i];
     eb.x += eb.vx * dt;
     eb.y += eb.vy * dt;
-    if (eb.x < -20 || eb.x > W + 20 || eb.y < -20 || eb.y > H + 20) {
+    if (eb.x < -20 || eb.x > cwE + 20 || eb.y < -20 || eb.y > chE + 20) {
       enemyBullets.splice(i, 1);
       continue;
     }
     if (player.invincible <= 0 && shieldTimer <= 0 &&
         Math.hypot(eb.x - player.x, eb.y - player.y) < eb.size + player.size) {
       enemyBullets.splice(i, 1);
-      damagePlayer(12, eb.x, eb.y);
+      damagePlayer(eb.dmg || 12, eb.x, eb.y);
       if (status !== 'playing') return;
     }
   }
@@ -1997,7 +2932,17 @@ function drawEnemies() {
     ctx.fill();
     // 身体（暗红径向渐变）
     const bodyG = ctx.createRadialGradient(-3, -3, 2, 0, 0, e.size + 2);
-    if (e.boss) { bodyG.addColorStop(0, '#8adc9a'); bodyG.addColorStop(0.55, '#43a047'); bodyG.addColorStop(1, '#14501f'); }
+    if (e.kind === 'prototype') { bodyG.addColorStop(0, '#d9a0ff'); bodyG.addColorStop(0.55, '#9b59d0'); bodyG.addColorStop(1, '#4a2570'); }
+    else if (e.kind === 'mutant') { bodyG.addColorStop(0, '#a8f08c'); bodyG.addColorStop(0.55, '#5ec93b'); bodyG.addColorStop(1, '#2a7a1a'); }
+    else if (e.kind === 'sniper') { bodyG.addColorStop(0, '#b39ddb'); bodyG.addColorStop(0.55, '#7e57c2'); bodyG.addColorStop(1, '#4a3375'); }
+    else if (e.kind === 'sentry') { bodyG.addColorStop(0, '#9fb4ff'); bodyG.addColorStop(0.55, '#4f6cd0'); bodyG.addColorStop(1, '#1d2a66'); }
+    else if (e.kind === 'drone') { bodyG.addColorStop(0, '#e6efff'); bodyG.addColorStop(0.55, '#7fa0e0'); bodyG.addColorStop(1, '#2a4a80'); }
+    else if (e.kind === 'commander') { bodyG.addColorStop(0, '#fff6d8'); bodyG.addColorStop(0.55, '#e8b94a'); bodyG.addColorStop(1, '#7a5518'); }
+    else if (e.kind === 'elite') { bodyG.addColorStop(0, '#d8a0a0'); bodyG.addColorStop(0.55, '#8a3838'); bodyG.addColorStop(1, '#331414'); }
+    else if (e.kind === 'alpha') { bodyG.addColorStop(0, '#f09080'); bodyG.addColorStop(0.55, '#c03838'); bodyG.addColorStop(1, '#4a1010'); }
+    else if (e.kind === 'prime') { bodyG.addColorStop(0, '#ff7a6a'); bodyG.addColorStop(0.55, '#a01818'); bodyG.addColorStop(1, '#1a0404'); }
+    else if (e.kind === 'general') { bodyG.addColorStop(0, '#ffd9a0'); bodyG.addColorStop(0.55, '#c8802a'); bodyG.addColorStop(1, '#4a2808'); }
+    else if (e.boss) { bodyG.addColorStop(0, '#8adc9a'); bodyG.addColorStop(0.55, '#43a047'); bodyG.addColorStop(1, '#14501f'); }
     else { bodyG.addColorStop(0, '#ff8587'); bodyG.addColorStop(0.55, '#ff4d4f'); bodyG.addColorStop(1, '#b3242b'); }
     ctx.fillStyle = bodyG;
     ctx.beginPath();
@@ -2009,19 +2954,77 @@ function drawEnemies() {
     // 外圈威胁环
     ctx.beginPath();
     ctx.arc(0, 0, e.size + 5, 0, Math.PI * 2);
-    ctx.strokeStyle = e.boss ? 'rgba(67, 160, 71, 0.6)' : 'rgba(255, 77, 79, 0.3)';
+    let ringColor = 'rgba(255, 77, 79, 0.3)';
+    if (e.kind === 'prototype') ringColor = 'rgba(155, 89, 208, 0.8)';
+    else if (e.kind === 'mutant') ringColor = 'rgba(94, 201, 59, 0.5)';
+    else if (e.kind === 'sniper' || e.kind === 'sentry') ringColor = 'rgba(126, 140, 230, 0.45)';
+    else if (e.kind === 'drone') ringColor = 'rgba(140, 180, 240, 0.5)';
+    else if (e.kind === 'commander') ringColor = 'rgba(232, 185, 74, 0.85)';
+    else if (e.kind === 'elite') ringColor = 'rgba(180, 60, 60, 0.5)';
+    else if (e.kind === 'alpha') ringColor = 'rgba(220, 80, 70, 0.55)';
+    else if (e.kind === 'prime') ringColor = 'rgba(255, 90, 60, 0.9)';
+    else if (e.kind === 'general') ringColor = 'rgba(255, 200, 110, 0.9)';
+    else if (e.boss) ringColor = 'rgba(67, 160, 71, 0.6)';
+    ctx.strokeStyle = ringColor;
     ctx.lineWidth = 1.5;
     ctx.stroke();
     // 朝向玩家：头盔 + 步枪
     ctx.rotate(e.ang);
-    ctx.fillStyle = e.boss ? '#14501f' : '#7f1d1d';
+    let helmColor = '#7f1d1d';
+    if (e.kind === 'prototype') helmColor = '#4a2570';
+    else if (e.kind === 'mutant') helmColor = '#2a7a1a';
+    else if (e.kind === 'sniper' || e.kind === 'sentry') helmColor = '#1d2a66';
+    else if (e.kind === 'drone') helmColor = '#2a4a80';
+    else if (e.kind === 'commander') helmColor = '#7a5518';
+    else if (e.kind === 'elite') helmColor = '#331414';
+    else if (e.kind === 'alpha') helmColor = '#4a1010';
+    else if (e.kind === 'prime') helmColor = '#1a0404';
+    else if (e.kind === 'general') helmColor = '#4a2808';
+    else if (e.boss) helmColor = '#14501f';
+    ctx.fillStyle = helmColor;
     ctx.beginPath();
     ctx.arc(e.size * 0.3, 0, e.size * 0.42, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#2a2d31';
-    ctx.fillRect(e.size * 0.3, -3, 14, 6);
-    ctx.fillStyle = '#ffb3b3';
-    ctx.fillRect(e.size * 0.3 - 2, -2, 5, 4);
+    if (e.kind === 'mutant') {
+      ctx.strokeStyle = 'rgba(90, 200, 60, 0.9)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-e.size * 0.5, -e.size * 0.3);
+      ctx.quadraticCurveTo(-e.size * 1.1, -e.size * 0.8, -e.size * 1.3, -e.size * 0.2);
+      ctx.moveTo(-e.size * 0.5, e.size * 0.2);
+      ctx.quadraticCurveTo(-e.size * 1.2, e.size * 0.6, -e.size * 1.35, e.size * 0.3);
+      ctx.stroke();
+    } else if (e.kind === 'drone') {
+      // 无人机：菱形机身 + 双旋翼
+      ctx.strokeStyle = 'rgba(220, 240, 255, 0.8)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, -e.size);
+      ctx.lineTo(e.size * 0.8, 0);
+      ctx.lineTo(0, e.size);
+      ctx.lineTo(-e.size * 0.8, 0);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(-e.size * 0.9, -e.size * 0.6, 3, 0, Math.PI * 2);
+      ctx.arc(-e.size * 0.9, e.size * 0.6, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#cfe6ff';
+      ctx.fill();
+    } else if (e.kind === 'sniper' || e.kind === 'sentry') {
+      ctx.strokeStyle = 'rgba(220, 190, 255, 0.7)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 5]);
+      ctx.beginPath();
+      ctx.moveTo(e.size * 0.3, 0);
+      ctx.lineTo(e.size * 1.7, 0);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    } else {
+      ctx.fillStyle = '#2a2d31';
+      ctx.fillRect(e.size * 0.3, -3, 14, 6);
+      ctx.fillStyle = '#ffb3b3';
+      ctx.fillRect(e.size * 0.3 - 2, -2, 5, 4);
+    }
     ctx.restore();
     // 受击白闪
     if (e.hitFlash > 0) {
@@ -2057,7 +3060,7 @@ function drawPlayer() {
   if (player.invincible > 0 && Math.floor(performance.now() / 90) % 2 === 0) {
     ctx.globalAlpha = 0.35;
   }
-  const aimAng = Math.atan2(aimY - player.y, aimX - player.x);
+  const aimAng = Math.atan2(aimWY - player.y, aimWX - player.x);
   // 阴影
   ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
   ctx.beginPath();
@@ -2115,7 +3118,7 @@ function drawAimLine() {
   if (document.body.classList.contains('touch')) return;
   ctx.beginPath();
   ctx.moveTo(player.x, player.y);
-  ctx.lineTo(aimX, aimY);
+  ctx.lineTo(aimWX, aimWY);
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
   ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 8]);
@@ -2157,12 +3160,19 @@ function render(dt) {
   if (shake > 0) {
     ctx.translate((Math.random() - 0.5) * 12 * shake, (Math.random() - 0.5) * 12 * shake);
   }
+  ctx.translate(-camX, -camY);
   drawMapGround();
   drawMapDecor();
+  drawCannon();
+  drawDataCore();
+  drawAntenna();
   drawWeather(dt);
   drawParticles();
   drawBullets();
   drawEnemies();
+  drawAllies();
+  drawGrenades();
+  drawMines();
   drawPlayer();
   drawRemotePlayers(dt);
   drawAimLine();
@@ -2250,6 +3260,8 @@ function updateHUD() {
   elHpFill.style.width = Math.round(player.hp / maxHp * 100) + '%';
   elHpFill.classList.toggle('low', player.hp <= maxHp * 0.3);
   elHpFill.classList.toggle('mid', player.hp > maxHp * 0.3 && player.hp <= maxHp * 0.6);
+  const gh = document.getElementById('grenadeHud');
+  if (gh) gh.innerText = '×' + playerGrenades;
 }
 
 /* ===== 流程控制 ===== */
@@ -2258,6 +3270,7 @@ function showHome() {
   clearTimeout(returnTimerId);
   overlayShop.hidden = true;
   overlayMap.hidden = true;
+  overlayStory.hidden = true;
   overlayPause.hidden = true;
   overlayFail.hidden = true;
   overlayEvac.hidden = true;
@@ -2374,6 +3387,7 @@ function startOnlineGame() {
   initAudio();
   currentMap = MAPS.trench;
   setRain(0);
+  setupWorld();
   buildMapTexture();
   initMapDecor();
   initWeather();
@@ -2383,7 +3397,10 @@ function startOnlineGame() {
   player.x = 200 + Math.random() * (W - 400); player.y = 200 + Math.random() * (H - 400);
   player.hp = 100; player.invincible = 1;
   aimX = player.x + 100; aimY = player.y;
+  aimWX = aimX; aimWY = aimY;
   bullets.length = 0; enemyBullets.length = 0; enemies.length = 0; particles.length = 0;
+  grenades.length = 0; enemyGrenades.length = 0; mines.length = 0;
+  playerGrenades = 3; grenadeCooldown = 0; mineTimer = 6;
   score = 0; elapsed = 0; shake = 0; flash = 0;
   overlayLobby.hidden = true; overlayHome.hidden = true; overlayMap.hidden = true;
   overlayFail.hidden = true; overlayEvac.hidden = true; overlayPause.hidden = true;
@@ -2486,6 +3503,38 @@ const STORY_DIALOGS = [
   { speaker: '指挥部', text: '收到，进入行政楼，让这些蛀虫滚出我们的土地！', radio: true },
   { speaker: '幽冥一号', text: '幽冥一号收到。', radio: false }
 ];
+/* ===== 剧情模式：战俘营 ===== */
+const PRISON_DIALOGS = [
+  { speaker: '指挥部', text: '幽冥1号，收到回答。', radio: true },
+  { speaker: '幽冥一号', text: '幽冥一号已抵达任务点。', radio: false },
+  { speaker: '指挥部', text: '收到，潜入战俘营，消灭敌方势力并营救我军战俘，是时候让他们尝些苦头了！', radio: true },
+  { speaker: '幽冥一号', text: '幽冥一号收到。', radio: false }
+];
+/* ===== 剧情模式：深渊协议（地下实验室） ===== */
+const LAB_DIALOGS = [
+  { speaker: '指挥部', text: '幽冥1号，收到回答。', radio: true },
+  { speaker: '幽冥一号', text: '幽冥一号已抵达任务点。', radio: false },
+  { speaker: '指挥部', text: '收到。战俘营缴获的情报指向这座"废弃矿场"——地下三百米，是一座生化研究所，"幽冥计划"的源头。潜入，拿到真相。', radio: true },
+  { speaker: '幽冥一号', text: '幽冥一号收到。', radio: false }
+];
+const SKY_DIALOGS = [
+  { speaker: '指挥部', text: '幽冥1号，收到回答。', radio: true },
+  { speaker: '幽冥一号', text: '幽冥一号已抵达天穹塔基座。', radio: false },
+  { speaker: '指挥部', text: '上传的数据指向这里——轨道电梯。敌方在近地轨道设有前哨站，是他们监视我们的眼睛。切断信号，幽冥一号。', radio: true },
+  { speaker: '幽冥一号', text: '幽冥一号收到。', radio: false }
+];
+const ZERO_DIALOGS = [
+  { speaker: '指挥部', text: '幽冥1号，收到回答。', radio: true },
+  { speaker: '幽冥一号', text: '幽冥一号已抵达原爆点。', radio: false },
+  { speaker: '指挥部', text: '所有线索都指向这里——幽冥计划的原点。这里，是"我们"开始的地方。摧毁它，结束这一切。', radio: true },
+  { speaker: '幽冥一号', text: '幽冥一号收到。', radio: false }
+];
+const FINALE_DIALOGS = [
+  { speaker: '指挥部', text: '幽冥1号，干得漂亮。上级对你很满意。', radio: true },
+  { speaker: '幽冥一号', text: '这是我应该做的。', radio: false },
+  { speaker: '指挥部', text: '进来吧，进指挥室，我亲自给你授勋。', radio: true },
+  { speaker: '幽冥一号', text: '……收到。', radio: false }
+];
 function playStoryDialogLine() {
   const ln = storyDialogLines[storyDialogIdx];
   dlgSpeaker.textContent = ln.speaker;
@@ -2493,13 +3542,14 @@ function playStoryDialogLine() {
   if (ln.radio) sfxRadio();
 }
 function startStoryDialog() {
-  storyDialogLines = STORY_DIALOGS.slice();
+  storyDialogLines = (currentMap.id === 'prison' ? PRISON_DIALOGS : currentMap.id === 'lab' ? LAB_DIALOGS : currentMap.id === 'sky' ? SKY_DIALOGS : currentMap.id === 'zero' ? ZERO_DIALOGS : currentMap.id === 'finale' ? FINALE_DIALOGS : STORY_DIALOGS).slice();
   storyDialogIdx = 0;
   storyDialogAfter = null;
   overlayDialog.hidden = false;
   playStoryDialogLine();
 }
 function showStoryDialog(speaker, text, radio, after) {
+  if (status === 'over') return; // 已结算/失败时不复活
   storyDialogLines = [{ speaker: speaker, text: text, radio: !!radio }];
   storyDialogAfter = after || null;
   storyDialogIdx = 0;
@@ -2547,12 +3597,437 @@ function triggerBossEvent() {
     });
   }, 1400);
 }
+/* ===== 剧情模式：战俘营 ===== */
+function prisonOnEnemyKilled(e) {
+  if (storyStage === 'gate' && !e.boss && !e.warden) {
+    prisonKills++;
+    elDiffName.innerText = '剧情 · 战俘营 肃清守卫 ' + prisonKills + '/' + prisonKillsNeeded;
+    if (prisonKills >= prisonKillsNeeded) {
+      storyStage = 'major';
+      enemies.length = 0; // 清空剩余守卫
+      toast('大门已破！继续向前推进，消灭敌军少校！');
+      setTimeout(spawnPrisonMajor, 900);
+    }
+  } else if (storyStage === 'ambush' && e.warden) {
+    ambushKills++;
+    elDiffName.innerText = '剧情 · 战俘营 肃清看守 ' + ambushKills + '/10';
+    if (ambushKills >= 10) {
+      storyStage = 'radio';
+      prisonRadioLine(0);
+    }
+  } else if (e.boss) {
+    // 少校被消灭 → 营救友军
+    storyStage = 'rescue';
+    showStoryDialog('友军士兵', '干得好，幽冥，是时候反击这帮混蛋了！', false, function () {
+      spawnAllies();
+      storyStage = 'ambush';
+      spawnWardens();
+      elDiffName.innerText = '剧情 · 战俘营 肃清看守 0/10';
+      toast('10 名看守一拥而上，与友军并肩作战！');
+    });
+  }
+}
+
+/* 战俘营：看守肃清后的对讲机剧情（顺序推进，逐句按空格） */
+const PRISON_RADIO_LINES = [
+  { speaker: '幽冥一号', text: '幽冥一号，完成任务状态良好，指挥部收到回答。', radio: false },
+  { speaker: '指挥部', text: '幽冥一号，收到，接下来带领友军炸掉敌方88毫米火炮。', radio: true },
+  { speaker: '幽冥一号', text: '幽冥一号收到。', radio: false }
+];
+function prisonRadioLine(idx) {
+  if (idx >= PRISON_RADIO_LINES.length) {
+    storyStage = 'cannon';
+    elDiffName.innerText = '剧情 · 战俘营 前往火炮区按 F 爆破';
+    toast('前往地图上方的 88 毫米火炮，靠近后按 F 爆破！');
+    return;
+  }
+  const ln = PRISON_RADIO_LINES[idx];
+  showStoryDialog(ln.speaker, ln.text, ln.radio, function () {
+    prisonRadioLine(idx + 1);
+  });
+}
+
+function spawnPrisonMajor() {
+  if (majorSpawned) return;
+  majorSpawned = true;
+  const cw = worldWidth();
+  const side = player.x < cw / 2 ? 1 : -1;
+  enemies.push({
+    x: Math.max(60, Math.min(cw - 60, player.x + side * 380)),
+    y: Math.max(80, player.y - 340),
+    size: 26, speed: 62, ang: 0, shootT: 0.9,
+    hp: 320, maxHp: 320, hitFlash: 0, frozen: 0, boss: true, major: true
+  });
+  toast('敌军少校出现了！');
+}
+
+function spawnWardens() {
+  if (ambushSpawned) return;
+  ambushSpawned = true;
+  const cw = worldWidth(), ch = worldHeight();
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2 + Math.random() * 0.6;
+    const d = 380 + Math.random() * 260;
+    enemies.push({
+      x: Math.max(40, Math.min(cw - 40, player.x + Math.cos(a) * d)),
+      y: Math.max(40, Math.min(ch - 40, player.y + Math.sin(a) * d)),
+      size: 18 + Math.random() * 3, speed: 88 + Math.random() * 20, ang: 0,
+      shootT: 0.5 + Math.random() * 0.4,
+      hp: 26, maxHp: 26, hitFlash: 0, frozen: 0, warden: true
+    });
+  }
+}
+
+function spawnAllies() {
+  allies = [];
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2;
+    allies.push({
+      x: player.x + Math.cos(a) * 110, y: player.y + Math.sin(a) * 110,
+      size: 17, speed: 235, ang: a, shootT: 0.3 + Math.random() * 0.3,
+      hp: 80, maxHp: 80, hitFlash: 0, n: i + 1
+    });
+  }
+}
+
+function updateAllies(dt) {
+  const cw = worldWidth(), ch = worldHeight();
+  for (let i = allies.length - 1; i >= 0; i--) {
+    const a = allies[i];
+    if (a.hitFlash > 0) a.hitFlash = Math.max(0, a.hitFlash - dt * 6);
+    const dx = player.x - a.x, dy = player.y - a.y;
+    const dist = Math.hypot(dx, dy);
+    const ux = dist > 0 ? dx / dist : 0, uy = dist > 0 ? dy / dist : 0;
+    if (dist > 210) { a.x += ux * a.speed * dt; a.y += uy * a.speed * dt; }
+    else if (dist < 95) { a.x -= ux * 110 * dt; a.y -= uy * 110 * dt; }
+    a.x = Math.max(24, Math.min(cw - 24, a.x));
+    a.y = Math.max(24, Math.min(ch - 24, a.y));
+    // 攻击最近敌人
+    let best = null, bd = 1e9;
+    for (const e of enemies) {
+      const d = Math.hypot(e.x - a.x, e.y - a.y);
+      if (d < bd) { bd = d; best = e; }
+    }
+    a.ang = best ? Math.atan2(best.y - a.y, best.x - a.x) : Math.atan2(dy, dx);
+    if (best && bd < 640) {
+      a.shootT -= dt;
+      if (a.shootT <= 0) {
+        a.shootT = 0.22 + Math.random() * 0.18;
+        const ang = Math.atan2(best.y - a.y, best.x - a.x) + (Math.random() - 0.5) * 0.09;
+        bullets.push({
+          x: a.x + Math.cos(ang) * 20, y: a.y + Math.sin(ang) * 20,
+          vx: Math.cos(ang) * 560, vy: Math.sin(ang) * 560,
+          size: 3, dmg: 8, ally: true
+        });
+        sfxGun();
+      }
+    }
+  }
+}
+
+function bombCannon() {
+  storyStage = 'bombed';
+  flash = 1; shake = 1; sfxBomb();
+  burst(cannonPos.x, cannonPos.y, '#ff8a50', 40);
+  burst(cannonPos.x, cannonPos.y, '#ffd23f', 30);
+  burst(cannonPos.x, cannonPos.y, '#3a3a3a', 26);
+  setTimeout(function () {
+    gameOver(true);
+  }, 1300);
+}
+
+/* 深渊协议（地下实验室）剧情推进 */
+function labOnEnemyKilled(e) {
+  if (storyStage === 'infiltrate' && e.kind !== 'prototype') {
+    labKills++;
+    elDiffName.innerText = '剧情 · 深渊协议 肃清矿场 ' + labKills + '/' + labKillsNeeded;
+    if (labKills >= labKillsNeeded) {
+      storyStage = 'holding';
+      labKills2 = 0;
+      enemies.length = 0;
+      showStoryDialog('幽冥一号', '废弃矿场已肃清……这是收容区。他们在这里进行活体实验——这些实验体，曾经也是人。', false, function () {
+        elDiffName.innerText = '剧情 · 深渊协议 肃清实验体 0/' + labKills2Needed;
+        toast('收容区实验体失控！消灭它们！');
+      });
+    }
+  } else if (storyStage === 'holding' && e.kind === 'mutant') {
+    labKills2++;
+    elDiffName.innerText = '剧情 · 深渊协议 肃清实验体 ' + labKills2 + '/' + labKills2Needed;
+    if (labKills2 >= labKills2Needed) {
+      storyStage = 'core';
+      labTimer = 45;
+      enemies.length = 0;
+      showStoryDialog('幽冥一号', '核心实验室……第一代幽冥原型体。原来我们，都是从这里开始的。', false, function () {
+        spawnPrototype();
+        elDiffName.innerText = '剧情 · 深渊协议 氧气 ' + Math.ceil(labTimer) + 's · 消灭原型体';
+        toast('氧气将在 45 秒后耗尽！消灭第一代原型体！');
+      });
+    }
+  } else if (e.kind === 'prototype') {
+    storyStage = 'datacore';
+    showStoryDialog('幽冥一号', '这就是……全部实验数据。该结束了。', false, function () {
+      elDiffName.innerText = '剧情 · 深渊协议 数据坟场 · 按 F 上传 / 按 G 销毁';
+      toast('接近数据核心：按 F 上传数据，或按 G 销毁数据');
+    });
+  }
+}
+function spawnPrototype() {
+  if (labBossSpawned) return;
+  labBossSpawned = true;
+  enemies.push({
+    x: dataCorePos.x, y: dataCorePos.y + 60,
+    size: 34, speed: 46, ang: 0, shootT: 1.4,
+    hp: 500, maxHp: 500, hitFlash: 0, frozen: 0,
+    boss: true, kind: 'prototype'
+  });
+}
+function drawDataCore() {
+  if (!(storyMode && currentMap.id === 'lab')) return;
+  const cx = dataCorePos.x, cy = dataCorePos.y;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = '#2a3a30';
+  ctx.fillRect(-26, -8, 52, 16);
+  ctx.fillStyle = '#15221b';
+  ctx.fillRect(-18, -52, 36, 46);
+  const pulse = storyStage === 'datacore' ? (0.55 + Math.sin(performance.now() / 400) * 0.35) : 0.3;
+  ctx.fillStyle = 'rgba(120, 255, 170, ' + pulse.toFixed(2) + ')';
+  ctx.fillRect(-14, -48, 28, 34);
+  ctx.fillStyle = '#0d1812';
+  ctx.fillRect(-14, -48, 28, 6);
+  ctx.restore();
+  if (storyStage === 'datacore') {
+    const blink = Math.floor(performance.now() / 300) % 2 === 0;
+    ctx.fillStyle = blink ? 'rgba(140, 255, 180, 0.95)' : 'rgba(140, 255, 180, 0.4)';
+    ctx.font = 'bold 15px "Segoe UI", "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('数据核心 · 按 F 上传 / 按 G 销毁', cx, cy - 62);
+  }
+}
+function skyOnEnemyKilled(e) {
+  if (storyStage === 'gate' && e.kind !== 'commander') {
+    skyKills++;
+    elDiffName.innerText = '剧情 · 天穹塔 肃清基座 ' + skyKills + '/' + skyKillsNeeded;
+    if (skyKills >= skyKillsNeeded) {
+      storyStage = 'shaft'; skyKills2 = 0; enemies.length = 0;
+      showStoryDialog('幽冥一号', '基座已肃清……电梯井就在上方。无人机群，全是无人机。', false, function () {
+        elDiffName.innerText = '剧情 · 天穹塔 肃清电梯井 0/' + skyKills2Needed;
+        toast('电梯井无人机群！肃清它们！');
+      });
+    }
+  } else if (storyStage === 'shaft' && e.kind !== 'commander') {
+    skyKills2++;
+    elDiffName.innerText = '剧情 · 天穹塔 肃清电梯井 ' + skyKills2 + '/' + skyKills2Needed;
+    if (skyKills2 >= skyKills2Needed) {
+      storyStage = 'top'; skyTimer = 60; enemies.length = 0;
+      showStoryDialog('幽冥一号', '塔顶……敌方指挥官。他在等我。', false, function () {
+        spawnCommander();
+        elDiffName.innerText = '剧情 · 天穹塔 电梯上行 ' + Math.ceil(skyTimer) + 's · 消灭指挥官';
+        toast('电梯上行倒计时 60 秒！消灭天穹指挥官！');
+      });
+    }
+  } else if (e.kind === 'commander') {
+    storyStage = 'antenna';
+    showStoryDialog('幽冥一号', '指挥官已倒下。天线，就在眼前。', false, function () {
+      elDiffName.innerText = '剧情 · 天穹塔 切断天线 · 按 F';
+      toast('接近轨道天线：按 F 切断信号');
+    });
+  }
+}
+function spawnCommander() {
+  if (skyBossSpawned) return;
+  skyBossSpawned = true;
+  enemies.push({
+    x: antennaPos.x, y: antennaPos.y + 70,
+    size: 32, speed: 50, ang: 0, shootT: 1.2,
+    hp: 550, maxHp: 550, hitFlash: 0, frozen: 0,
+    boss: true, kind: 'commander'
+  });
+}
+function drawAntenna() {
+  if (!(storyMode && currentMap.id === 'sky')) return;
+  const cx = antennaPos.x, cy = antennaPos.y;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.strokeStyle = '#c9d4e8';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(0, 30);
+  ctx.lineTo(0, -50);
+  ctx.stroke();
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.moveTo(0, -40 + i * 16);
+    ctx.lineTo(-14, -32 + i * 16);
+    ctx.moveTo(0, -40 + i * 16);
+    ctx.lineTo(14, -32 + i * 16);
+    ctx.stroke();
+  }
+  ctx.fillStyle = storyStage === 'antenna' ? 'rgba(255, 90, 90, 0.95)' : 'rgba(255, 90, 90, 0.5)';
+  ctx.beginPath();
+  ctx.arc(0, -54, 6, 0, Math.PI * 2);
+  ctx.fill();
+  if (storyStage === 'antenna') {
+    ctx.strokeStyle = 'rgba(255, 120, 120, 0.35)';
+    for (let r = 1; r <= 3; r++) {
+      ctx.beginPath();
+      ctx.arc(0, -54, 10 * r + (performance.now() / 120 % 8), -Math.PI * 0.7, -Math.PI * 0.3);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+  if (storyStage === 'antenna') {
+    const blink = Math.floor(performance.now() / 300) % 2 === 0;
+    ctx.fillStyle = blink ? 'rgba(255, 180, 120, 0.95)' : 'rgba(255, 180, 120, 0.4)';
+    ctx.font = 'bold 15px "Segoe UI", "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('轨道天线 · 按 F 切断信号', cx, cy - 72);
+  }
+}
+function zeroOnEnemyKilled(e) {
+  if (storyStage === 'gate' && e.kind !== 'prime') {
+    zeroKills++;
+    elDiffName.innerText = '剧情 · 原爆点 肃清焦土 ' + zeroKills + '/' + zeroKillsNeeded;
+    if (zeroKills >= zeroKillsNeeded) {
+      storyStage = 'pit'; zeroKills2 = 0; enemies.length = 0;
+      showStoryDialog('幽冥一号', '焦土已肃清……下面，就是核心坑。那些失败品，还在徘徊。', false, function () {
+        elDiffName.innerText = '剧情 · 原爆点 肃清深坑 0/' + zeroKills2Needed;
+        toast('强化实验体逼近！');
+      });
+    }
+  } else if (storyStage === 'pit' && e.kind === 'alpha') {
+    zeroKills2++;
+    elDiffName.innerText = '剧情 · 原爆点 肃清深坑 ' + zeroKills2 + '/' + zeroKills2Needed;
+    if (zeroKills2 >= zeroKills2Needed) {
+      storyStage = 'core'; zeroTimer = 40; enemies.length = 0;
+      showStoryDialog('幽冥一号', '核心……"零号原型"。原来，我就是它的延续。', false, function () {
+        spawnPrime();
+        elDiffName.innerText = '剧情 · 原爆点 核心过载 ' + Math.ceil(zeroTimer) + 's · 消灭零号原型';
+        toast('核心过载倒计时 40 秒！消灭零号原型！');
+      });
+    }
+  } else if (e.kind === 'prime') {
+    showStoryDialog('幽冥一号', '一切，都在这里结束了。', false, function () { gameOver(true); });
+  }
+}
+function spawnPrime() {
+  if (zeroBossSpawned) return;
+  zeroBossSpawned = true;
+  enemies.push({
+    x: worldW / 2, y: worldH * 0.18,
+    size: 36, speed: 54, ang: 0, shootT: 1.0,
+    hp: 650, maxHp: 650, hitFlash: 0, frozen: 0,
+    boss: true, kind: 'prime'
+  });
+}
+function finaleOnEnemyKilled(e) {
+  if (storyStage === 'betray' && e.kind !== 'general') {
+    finaleKills++;
+    elDiffName.innerText = '剧情 · 谢幕 肃清近卫 ' + finaleKills + '/' + finaleKillsNeeded;
+    if (finaleKills >= finaleKillsNeeded) {
+      storyStage = 'pursue'; finaleKills2 = 0; enemies.length = 0;
+      showStoryDialog('指挥部', '你以为，你能活着离开这间屋子吗？知道得太多的人，都得死。', false, function () {
+        elDiffName.innerText = '剧情 · 谢幕 肃清追兵 0/' + finaleKills2Needed;
+        toast('指挥部背叛了！突围！');
+      });
+    }
+  } else if (storyStage === 'pursue' && e.kind !== 'general') {
+    finaleKills2++;
+    elDiffName.innerText = '剧情 · 谢幕 肃清追兵 ' + finaleKills2 + '/' + finaleKills2Needed;
+    if (finaleKills2 >= finaleKills2Needed) {
+      storyStage = 'duel'; enemies.length = 0;
+      showStoryDialog('指挥部', '把幽冥一号留下！', false, function () {
+        spawnGeneral();
+        elDiffName.innerText = '剧情 · 谢幕 对决指挥部将领';
+        toast('指挥部将领亲自出手！');
+      });
+    }
+  } else if (e.kind === 'general') {
+    storyStage = 'end';
+    showStoryDialog('幽冥一号', '原来……从一开始，我们就是可消耗的。', false, function () {
+      showStoryDialog('旁白', '幽冥一号，谢幕。', false, function () {
+        gameOver(true);
+      });
+    });
+  }
+}
+function spawnGeneral() {
+  if (finaleBossSpawned) return;
+  finaleBossSpawned = true;
+  enemies.push({
+    x: W / 2, y: H * 0.25,
+    size: 30, speed: 56, ang: 0, shootT: 1.0,
+    hp: 600, maxHp: 600, hitFlash: 0, frozen: 0,
+    boss: true, kind: 'general'
+  });
+}
+function drawCannon() {
+  if (!(storyMode && currentMap.id === 'prison')) return;
+  const cx = cannonPos.x, cy = cannonPos.y;
+  ctx.save();
+  ctx.translate(cx, cy);
+  // 底座 + 轮子
+  ctx.fillStyle = '#4a4538';
+  ctx.fillRect(-38, -8, 76, 16);
+  ctx.fillStyle = '#2e2a22';
+  ctx.beginPath(); ctx.arc(-30, 10, 12, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(30, 10, 12, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#4d4638';
+  ctx.beginPath(); ctx.arc(-30, 10, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(30, 10, 5, 0, Math.PI * 2); ctx.fill();
+  // 炮管
+  ctx.fillStyle = '#3f4a3a';
+  ctx.fillRect(-7, -64, 14, 58);
+  ctx.fillStyle = '#1f2a1c';
+  ctx.fillRect(-9, -64, 18, 8);
+  ctx.fillStyle = '#161c14';
+  ctx.fillRect(-11, -66, 22, 6);
+  ctx.restore();
+  // 阶段提示（cannon 阶段闪烁）
+  if (storyStage === 'cannon') {
+    const blink = Math.floor(performance.now() / 300) % 2 === 0;
+    ctx.fillStyle = blink ? 'rgba(255, 210, 63, 0.95)' : 'rgba(255, 210, 63, 0.4)';
+    ctx.font = 'bold 16px "Segoe UI", "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('88mm 火炮 · 按 F 爆破', cx, cy - 82);
+  }
+}
+
+function drawAllies() {
+  for (const a of allies) {
+    ctx.save();
+    ctx.translate(a.x, a.y);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath(); ctx.ellipse(2, 3.5, a.size + 4, a.size * 0.85, 0, 0, Math.PI * 2); ctx.fill();
+    const bg = ctx.createRadialGradient(-3, -3, 2, 0, 0, a.size + 2);
+    bg.addColorStop(0, '#7fb5ff'); bg.addColorStop(0.55, '#3b82f6'); bg.addColorStop(1, '#1e4fa8');
+    ctx.fillStyle = bg;
+    ctx.beginPath(); ctx.arc(0, 0, a.size, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.rotate(a.ang);
+    ctx.fillStyle = '#1d4e8f';
+    ctx.beginPath(); ctx.arc(a.size * 0.3, 0, a.size * 0.42, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#20242a';
+    ctx.fillRect(a.size * 0.3, -3.2, 16, 6.4);
+    ctx.fillStyle = '#dfe6ee';
+    ctx.fillRect(a.size * 0.3 - 2, -2.2, 5, 4.4);
+    ctx.restore();
+    if (a.hitFlash > 0) {
+      ctx.save(); ctx.globalAlpha = a.hitFlash * 0.5;
+      ctx.beginPath(); ctx.arc(a.x, a.y, a.size + 3, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill();
+      ctx.restore();
+    }
+    if (a.hp < a.maxHp) {
+      const bw = a.size * 2.2;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(a.x - bw / 2, a.y - a.size - 14, bw, 4);
+      ctx.fillStyle = '#3b82f6'; ctx.fillRect(a.x - bw / 2, a.y - a.size - 14, bw * Math.max(0, a.hp / a.maxHp), 4);
+    }
+  }
+}
+
 function startStoryGame() {
   initAudio();
-  setRain(1);
-  buildMapTexture();
-  initMapDecor();
-  initWeather();
   clearTimeout(returnTimerId);
   // 剧情模式：强制配装 HK416 + 幽冥护甲，无天赋大招
   storyMode = true;
@@ -2567,17 +4042,61 @@ function startStoryGame() {
   score = 0;
   player.hp = maxHp;
   player.invincible = 0;
-  player.x = W / 2; player.y = H - 130;
   bullets.length = 0; enemyBullets.length = 0;
-  enemies.length = 0; particles.length = 0;
+  enemies.length = 0; particles.length = 0; allies.length = 0;
+  grenades.length = 0; enemyGrenades.length = 0; mines.length = 0;
+  playerGrenades = 3; grenadeCooldown = 0; mineTimer = 6;
   elapsed = 0; spawnTimer = 0.8; fireCooldown = 0;
   shake = 0; flash = 0;
   ultTimer = 9999; rageTimer = 0; shieldTimer = 0; slowTimer = 0; freezeTimer = 0; droneTimer = 0;
   riskedItems = [];
   cancelEvacuateUI();
-  elDiffName.innerText = '剧情 · 行政大厅 肃清 0/' + storyKillsNeeded;
+  setupWorld();
+  if (currentMap.id === 'admin') {
+    setRain(1);
+    storyStage = null;
+    player.x = W / 2; player.y = H - 130;
+    elDiffName.innerText = '剧情 · 行政大厅 肃清 0/' + storyKillsNeeded;
+  } else if (currentMap.id === 'prison') {
+    setRain(0);
+    storyStage = 'gate';
+    prisonKills = 0; ambushKills = 0; majorSpawned = false; ambushSpawned = false;
+    player.x = worldW / 2; player.y = worldH - 150; // 从营区入口进入
+    cannonPos = { x: worldW / 2, y: worldH * 0.22 };
+    elDiffName.innerText = '剧情 · 战俘营 肃清守卫 0/' + prisonKillsNeeded;
+  } else if (currentMap.id === 'lab') {
+    setRain(0);
+    storyStage = 'infiltrate';
+    labKills = 0; labKills2 = 0; labTimer = 45; labChoice = ''; labBossSpawned = false;
+    player.x = worldW / 2; player.y = worldH - 150; // 矿场入口
+    dataCorePos = { x: worldW / 2, y: worldH * 0.16 };
+    elDiffName.innerText = '剧情 · 深渊协议 肃清矿场 0/' + labKillsNeeded;
+  } else if (currentMap.id === 'sky') {
+    setRain(0);
+    storyStage = 'gate';
+    skyKills = 0; skyKills2 = 0; skyTimer = 60; skyBossSpawned = false;
+    player.x = worldW / 2; player.y = worldH - 150; // 天穹塔基座入口
+    antennaPos = { x: worldW / 2, y: worldH * 0.16 };
+    elDiffName.innerText = '剧情 · 天穹塔 肃清基座 0/' + skyKillsNeeded;
+  } else if (currentMap.id === 'zero') {
+    setRain(0);
+    storyStage = 'gate';
+    zeroKills = 0; zeroKills2 = 0; zeroTimer = 40; zeroBossSpawned = false;
+    player.x = worldW / 2; player.y = worldH - 150; // 原爆点外围
+    elDiffName.innerText = '剧情 · 原爆点 肃清焦土 0/' + zeroKillsNeeded;
+  } else if (currentMap.id === 'finale') {
+    setRain(0);
+    storyStage = 'award';
+    finaleKills = 0; finaleKills2 = 0; finaleBossSpawned = false;
+    player.x = W / 2; player.y = H - 130;
+    elDiffName.innerText = '剧情 · 谢幕';
+  }
+  buildMapTexture();
+  initMapDecor();
+  initWeather();
   overlayHome.hidden = true;
   overlayMap.hidden = true;
+  overlayStory.hidden = true;
   overlayFail.hidden = true;
   overlayEvac.hidden = true;
   overlayPause.hidden = true;
@@ -2589,6 +4108,12 @@ function startStoryGame() {
   cancelAnimationFrame(rafId);
   status = 'dialog';
   startStoryDialog();
+  if (currentMap.id === 'finale') {
+    storyDialogAfter = function () {
+      storyStage = 'betray';
+      elDiffName.innerText = '剧情 · 谢幕 肃清近卫 0/' + finaleKillsNeeded;
+    };
+  }
 }
 
 function startMission() {
@@ -2603,9 +4128,11 @@ function startMission() {
 }
 
 function startGame() {
-  storyMode = false; storyBossSpawned = false;
+  storyMode = false; storyBossSpawned = false; storyStage = null;
+  allies.length = 0;
   initAudio();
   setRain(currentMap.rainVol);
+  setupWorld();
   buildMapTexture();
   initMapDecor();
   initWeather();
@@ -2620,6 +4147,8 @@ function startGame() {
   enemyBullets.length = 0;
   enemies.length = 0;
   particles.length = 0;
+  grenades.length = 0; enemyGrenades.length = 0; mines.length = 0;
+  playerGrenades = 3; grenadeCooldown = 0; mineTimer = 6;
   elapsed = 0;
   spawnTimer = 0.4;
   fireCooldown = 0;
@@ -2690,7 +4219,18 @@ function gameOver(evacuated) {
     if (earned > 0) addCores(earned);
     document.getElementById('evacScore').innerText = String(score);
     document.getElementById('evacBest').innerText = String(highScore);
-    document.getElementById('evacDiff').innerText = currentDiff.name + '行动';
+    document.getElementById('evacDiff').innerText = storyMode ? ('剧情 · ' + currentMap.name) : (currentDiff.name + '行动');
+    let evacSubText = storyMode ? '任务目标达成，行动圆满完成。' : '成功撤离战区，任务完成。';
+    if (storyMode && currentMap.id === 'lab') {
+      evacSubText = labChoice === 'upload' ? '数据已上传总部。真相，将无法再被掩埋。' : '数据已销毁。有些真相，不该被任何人触碰。';
+    } else if (storyMode && currentMap.id === 'sky') {
+      evacSubText = '天穹塔已切断。轨道前哨站，永远沉默。';
+    } else if (storyMode && currentMap.id === 'zero') {
+      evacSubText = '一切，都在这里结束了。';
+    } else if (storyMode && currentMap.id === 'finale') {
+      evacSubText = '幽冥一号，谢幕。';
+    }
+    document.getElementById('evacSub').innerText = evacSubText;
     document.getElementById('evacCores').innerText = '+' + earned + '（余额 ' + cores + '）';
     document.getElementById('evacNewRecord').style.display = isNewRecord ? 'block' : 'none';
     overlayEvac.hidden = false;
@@ -2748,10 +4288,27 @@ window.addEventListener('keydown', function (e) {
     else if (status === 'paused') resumeGame();
   }
   if (k === 'v') {
-    if (status === 'playing' && !net.playing) startEvacuate();
+    if (status === 'playing' && !net.playing && !storyMode) startEvacuate();
   }
   if (k === 'q') {
-    if (status === 'playing' && !net.playing) useUltimate();
+    if (status === 'playing' && !net.playing && !storyMode) useUltimate();
+  }
+  if ((k === 'f' || k === 'g') && storyMode && currentMap.id === 'lab' && storyStage === 'datacore' && status === 'playing') {
+    const d = Math.hypot(player.x - dataCorePos.x, player.y - dataCorePos.y);
+    if (d < 130) {
+      labChoice = k === 'f' ? 'upload' : 'destroy';
+      showStoryDialog('幽冥一号', k === 'f' ? '数据已上传总部。真相，将无法再被掩埋。' : '数据已销毁。有些真相，不该被任何人触碰。', false, function () { gameOver(true); });
+    } else {
+      toast('靠近数据核心再操作');
+    }
+  }
+  if (k === 'f' && storyMode && currentMap.id === 'sky' && storyStage === 'antenna' && status === 'playing') {
+    const d = Math.hypot(player.x - antennaPos.x, player.y - antennaPos.y);
+    if (d < 130) {
+      showStoryDialog('幽冥一号', '天穹塔已切断。轨道前哨站，永远沉默。', false, function () { gameOver(true); });
+    } else {
+      toast('接近天线再操作');
+    }
   }
   if (k === 'enter' || k === ' ') {
     if (status === 'ready') openMapSelect();
@@ -2766,6 +4323,8 @@ window.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = fals
 window.addEventListener('pointermove', function (e) {
   aimX = e.clientX;
   aimY = e.clientY;
+  aimWX = e.clientX + camX;
+  aimWY = e.clientY + camY;
   crosshairEl.style.left = e.clientX + 'px';
   crosshairEl.style.top = e.clientY + 'px';
 }, { passive: true });
@@ -2773,9 +4332,13 @@ window.addEventListener('pointermove', function (e) {
 canvas.addEventListener('pointerdown', function (e) {
   e.preventDefault();
   if (status !== 'playing') return;
-  shootAt(e.clientX, e.clientY);
+  shootAt(e.clientX + camX, e.clientY + camY);
   fireCooldown = playerFireInterval;
   firing = true;
+});
+canvas.addEventListener('contextmenu', function (e) {
+  e.preventDefault();
+  throwGrenade();
 });
 window.addEventListener('pointerup', function () { firing = false; });
 
@@ -3133,6 +4696,11 @@ function renderInv() {
 
 /* ===== 按钮绑定 ===== */
 document.getElementById('btnStart').addEventListener('click', openMapSelect);
+document.getElementById('btnStory').addEventListener('click', openStorySelect);
+document.getElementById('btnStoryBack').addEventListener('click', function () {
+  overlayStory.hidden = true;
+  showHome();
+});
 document.getElementById('btnMapBack').addEventListener('click', function () {
   overlayMap.hidden = true;
   showHome();
@@ -3166,7 +4734,9 @@ document.getElementById('tabInv').addEventListener('click', function () {
   renderInv();
 });
 document.getElementById('btnResume').addEventListener('click', resumeGame);
-document.getElementById('btnRetry').addEventListener('click', startMission);
+document.getElementById('btnRetry').addEventListener('click', function () {
+  if (storyMode) startStoryGame(); else startMission();
+});
 document.getElementById('btnFailHome').addEventListener('click', showHome);
 document.getElementById('btnEvacHome').addEventListener('click', function () {
   clearInterval(returnTimerId);
