@@ -750,7 +750,56 @@
     </div>
 
     <div class="home-char">
-      <img id="charImg" alt="主角士兵">
+      <svg id="charImg" viewBox="0 0 220 440" width="230" height="460" aria-label="主角士兵">
+        <defs>
+          <linearGradient id="charBody" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#2a3236"/>
+            <stop offset="1" stop-color="#0e1214"/>
+          </linearGradient>
+          <radialGradient id="charGlow" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0" stop-color="rgba(255,190,110,0.35)"/>
+            <stop offset="1" stop-color="rgba(255,190,110,0)"/>
+          </radialGradient>
+        </defs>
+        <!-- 脚下暖光 -->
+        <ellipse cx="110" cy="410" rx="70" ry="14" fill="url(#charGlow)"/>
+        <!-- 钢盔 -->
+        <path d="M78 78 Q110 56 142 78 L148 92 Q110 84 72 92 Z" fill="#1c2225" stroke="rgba(255,200,130,0.55)" stroke-width="1.5"/>
+        <!-- 头 -->
+        <circle cx="110" cy="104" r="15" fill="url(#charBody)" stroke="rgba(255,200,130,0.45)" stroke-width="1.2"/>
+        <!-- 护目镜 -->
+        <rect x="96" y="100" width="28" height="6" rx="3" fill="#0a0d0e" stroke="rgba(120,180,220,0.5)" stroke-width="0.8"/>
+        <!-- 脖子 -->
+        <rect x="104" y="118" width="12" height="8" fill="#1a2023"/>
+        <!-- 战术背心/躯干 -->
+        <path d="M74 128 Q110 118 146 128 L154 218 Q110 230 66 218 Z" fill="url(#charBody)" stroke="rgba(255,200,130,0.5)" stroke-width="1.5"/>
+        <!-- 弹匣袋 -->
+        <rect x="86" y="160" width="16" height="22" rx="2" fill="#0a0d0e" stroke="rgba(255,200,130,0.35)" stroke-width="0.8"/>
+        <rect x="118" y="160" width="16" height="22" rx="2" fill="#0a0d0e" stroke="rgba(255,200,130,0.35)" stroke-width="0.8"/>
+        <!-- 腰带 -->
+        <rect x="72" y="214" width="76" height="9" fill="#0a0d0e" stroke="rgba(255,200,130,0.4)" stroke-width="0.8"/>
+        <!-- 左臂（持枪侧） -->
+        <path d="M74 132 L52 200 L66 206 L86 140 Z" fill="url(#charBody)" stroke="rgba(255,200,130,0.45)" stroke-width="1.3"/>
+        <!-- 右臂 -->
+        <path d="M146 132 L168 196 L154 204 L134 140 Z" fill="url(#charBody)" stroke="rgba(255,200,130,0.45)" stroke-width="1.3"/>
+        <!-- 步枪（斜持） -->
+        <g transform="rotate(-18 110 200)">
+          <rect x="60" y="192" width="110" height="9" rx="2" fill="#0a0d0e" stroke="rgba(180,200,210,0.5)" stroke-width="0.8"/>
+          <rect x="56" y="190" width="10" height="13" rx="2" fill="#0a0d0e"/>
+          <rect x="150" y="190" width="22" height="5" rx="1" fill="#0a0d0e"/>
+          <rect x="92" y="201" width="8" height="14" fill="#0a0d0e"/>
+        </g>
+        <!-- 左腿 -->
+        <path d="M80 224 L74 330 L92 330 L100 228 Z" fill="url(#charBody)" stroke="rgba(255,200,130,0.45)" stroke-width="1.3"/>
+        <!-- 右腿 -->
+        <path d="M140 224 L146 330 L128 330 L120 228 Z" fill="url(#charBody)" stroke="rgba(255,200,130,0.45)" stroke-width="1.3"/>
+        <!-- 绑腿 -->
+        <rect x="74" y="290" width="20" height="8" fill="#0a0d0e"/>
+        <rect x="126" y="290" width="20" height="8" fill="#0a0d0e"/>
+        <!-- 军靴 -->
+        <path d="M70 330 L96 330 L96 346 L68 346 Z" fill="#0a0d0e" stroke="rgba(255,200,130,0.4)" stroke-width="1"/>
+        <path d="M124 330 L150 330 L152 346 L124 346 Z" fill="#0a0d0e" stroke="rgba(255,200,130,0.4)" stroke-width="1"/>
+      </svg>
     </div>
 
     <div class="home-bottom">
@@ -4746,8 +4795,6 @@ document.getElementById('btnEvacHome').addEventListener('click', function () {
 /* ===== 启动 ===== */
 document.getElementById('homeBg').style.backgroundImage =
   "url('https://aka.doubaocdn.com/s/cUfBLE2nX1')";
-document.getElementById('charImg').src =
-  'https://aka.doubaocdn.com/s/82p17kHzh1';
 
 resize();
 player.x = W / 2;
